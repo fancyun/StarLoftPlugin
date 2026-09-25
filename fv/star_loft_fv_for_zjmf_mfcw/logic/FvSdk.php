@@ -1,36 +1,24 @@
 <?php
 namespace certification\star_loft_fv_for_zjmf_mfcw\logic;
 
+require_once __DIR__ . '/sdk/Client.php';
+require_once __DIR__ . '/sdk/FvClient.php';
+
+use StarLoft\Sdk\FvClient;
+
 /**
- * StarLoft 星楼网络 SDK
+ * StarLoft 星楼网络 FV 插件适配层
  *
- * 用于对接「星楼网络」平台子产品级服务（人脸核验 FV）的 SDK 类。
- * 所有请求使用 API Key + HMAC-SHA256 签名鉴权，请求头：
- *   X-Api-Key / X-Sign=hex(HMAC-SHA256(api_secret, 原始请求体)) /
- *   X-Sign-Version: hmac_sha256 / X-Timestamp
- *
- * 接口前缀统一为 /api/fv（对应 README 中的 FV 平台，域名含
- * www.starloft.cn / service.starloft.cn）。
- *
- * 平台按「子产品」对外提供服务标识(service)，如 fv_auth / fv_self 等，
- * 由 createOrder 传入。
+ * HTTP 通信与 HMAC-SHA256 签名由 StarLoft PHP SDK（logic/sdk/）实现，
+ * 本类保留插件侧错误分类与结果规范化逻辑。
  *
  * @author StarLoft
- * @version 2.0.0
+ * @version 2.1.0
  */
 class FvSdk
 {
-    /** @var string API基础URL */
-    private $apiUrl;
-
-    /** @var string API Key */
-    private $apiKey;
-
-    /** @var string API Secret */
-    private $apiSecret;
-
-    /** @var int 请求超时时间（秒） */
-    private $timeout = 30;
+    /** @var FvClient */
+    private $client;
 
     /**
      * 错误分类常量（用于上层根据语义做不同动作）
@@ -48,39 +36,17 @@ class FvSdk
     /**
      * 根据接口返回判断错误分类
      *
-     * 兼容两种返回字段:
-     *   - 规范化(code/message): SDK 在 request() 末尾会把上游 result_* 双写进来
-     *   - 原生(result_code/result_message): 上层直接拿接口返回值判断时也能走通
-     *
      * result_code ↔ 含义映射(来源: 上游文档表):
-     *   1000 SUCCESS              验证成功
-     *   2000 PASS_LIVING_NOT_THE_SAME  活体过了但非同一人(计费,终态不通过)
-     *   3000 NO_ID_CARD_NUMBER    无此身份证号(计费,终态不通过)
-     *   3000 ID_NUMBER_NAME_NOT_MATCH  证号姓名不匹配(计费,终态不通过)
-     *   3000 NO_FACE_FOUND        无检测到人脸(计费,终态不通过)
-     *   3000 NO_ID_PHOTO          找不到参考照片(计费,终态不通过)
-     *   3000 PHOTO_FORMAT_ERROR   参考照片格式错(计费,终态不通过)
-     *   3000 DATA_SOURCE_ERROR    参考数据源错误(不计费,临时错误 -> 重试)
-     *   3000 INTERNAL_ERROR       服务器内部错误(不计费,临时错误 -> 重试)
-     *   4000 FAIL_LIVING_FACE_ATTACK  活体攻击/活体失败(计费,终态不通过)
-     *   6000 NOT_STARTED          验证未开始(继续等)
-     *   6000 PROCESSING           验证进行中(继续等)
-     *   6000 FAILED               验证流程异常结束(终态失败)
-     *   6000 CANCELLED            用户主动取消(终态失败)
-     *   6000 TIMEOUT              验证超时(终态失败)
-     *   6100 SUPPORT_ERROR        浏览器不支持 webRTC(用户侧可恢复 -> 继续等)
-     *   6100 PERMISSIONS_ERROR    拒绝摄像头权限(用户侧可恢复 -> 继续等)
-     *   6100 OTHER_ERROR          其他 webRTC 连接错误(用户侧可恢复 -> 继续等)
+     *   1000 SUCCESS / 2000 活体过但非同一人 / 3000 要素类(需按 message 细分) /
+     *   4000 活体攻击 / 6000 流程类 / 6100 浏览器权限类
      */
     public static function classifyError($result)
     {
         if (!is_array($result)) {
             return self::ERR_CAT_UNKNOWN;
         }
-        // --- 1. 统一字段: 同时兼容 SDK 规范化(code/message)与原生(result_code/result_message)
         $rawCode    = self::pickFirst($result, ['code', 'result_code']);
         $rawMessage = (string)self::pickFirst($result, ['message', 'result_message', 'msg'], '');
-        // data.result_code / data.result_message(某些接口嵌套一层)
         if (is_array($result['data'] ?? null)) {
             if ($rawCode === null || $rawCode === '') {
                 $rawCode = self::pickFirst($result['data'], ['code', 'result_code', 'status_code']);
@@ -90,7 +56,6 @@ class FvSdk
             }
         }
 
-        // --- 2. 成功判断(1000 SUCCESS / code 0 / SUCCESS 文案)
         $strCode = (string)$rawCode;
         $intCode = (int)$rawCode;
         if ($rawCode === 0 || $rawCode === '0'
@@ -99,17 +64,13 @@ class FvSdk
             return self::ERR_CAT_SUCCESS;
         }
 
-        // --- 3. 原生 result_code 语义分类(优先于通用 code 分类)
         if ($rawCode !== null && $rawCode !== '') {
-            // 2000 活体过了但非同一人 -> 计费,终态不通过
             if (self::matchResCode($rawCode, 2000)) {
                 return self::ERR_CAT_REJECT;
             }
-            // 4000 活体攻击/活体失败 -> 计费,终态不通过
             if (self::matchResCode($rawCode, 4000)) {
                 return self::ERR_CAT_REJECT;
             }
-            // 3000 需按 message 区分: 计费拒绝 vs 不计费临时错误
             if (self::matchResCode($rawCode, 3000)) {
                 $rejectMsgs = ['NO_ID_CARD_NUMBER','ID_NUMBER_NAME_NOT_MATCH','NO_FACE_FOUND','NO_ID_PHOTO','PHOTO_FORMAT_ERROR'];
                 if (in_array(strtoupper($rawMessage), $rejectMsgs, true)) {
@@ -119,21 +80,17 @@ class FvSdk
                     return self::ERR_CAT_TEMP;
                 }
             }
-            // 6000 NOT_STARTED / PROCESSING -> 用户侧可恢复(继续轮询)
             if (self::matchResCode($rawCode, 6000) && in_array(strtoupper($rawMessage), ['NOT_STARTED','PROCESSING'], true)) {
                 return self::ERR_CAT_USER_ACTION;
             }
-            // 6000 FAILED / CANCELLED / TIMEOUT -> 核验终态失败(流程终止)
             if (self::matchResCode($rawCode, 6000) && in_array(strtoupper($rawMessage), ['FAILED','CANCELLED','TIMEOUT'], true)) {
                 return self::ERR_CAT_REJECT;
             }
-            // 6100 浏览器/权限/连接错误 -> 用户侧可恢复(继续轮询)
             if (self::matchResCode($rawCode, 6100)) {
                 return self::ERR_CAT_USER_ACTION;
             }
         }
 
-        // --- 4. 兼容 HTTP code / 兜底分类
         $msg = strtolower($rawMessage);
         $codeIn = function ($arr) use ($rawCode, $intCode, $strCode) {
             foreach ($arr as $v) {
@@ -142,7 +99,6 @@ class FvSdk
             }
             return false;
         };
-        // 余额/额度不足(排除"免费次数不足")
         $isFreeTimesLimit = (strpos($rawMessage, '免费') !== false && (strpos($rawMessage, '次数') !== false || strpos($rawMessage, '不足') !== false))
                             || strpos($rawMessage, '免费次数') !== false
                             || (strpos($rawMessage, '次数') !== false && strpos($rawMessage, '不足') !== false);
@@ -156,7 +112,6 @@ class FvSdk
                 return self::ERR_CAT_NO_BALANCE;
             }
         }
-        // 鉴权/签名
         if ($codeIn([401, 403, 4010, 4011, 4013, 1001, 1002, 1003])
             || strpos($msg, 'sign') !== false
             || strpos($msg, '签名') !== false
@@ -170,7 +125,6 @@ class FvSdk
             || strpos($msg, 'permission') !== false) {
             return self::ERR_CAT_AUTH;
         }
-        // 参数错误
         if ($codeIn([400, 422, 4000, 4001])
             || strpos($msg, '参数') !== false
             || (strpos($msg, '身份证') !== false && (strpos($msg, '格式') !== false || strpos($msg, '无效') !== false || strpos($msg, '错误') !== false))
@@ -180,14 +134,12 @@ class FvSdk
             || strpos($msg, 'invalid') !== false) {
             return self::ERR_CAT_PARAM;
         }
-        // 订单不存在
         if ($codeIn([404, 410, 4005])
             || strpos($msg, '不存在') !== false
             || strpos($msg, 'not found') !== false
             || strpos($msg, 'no record') !== false) {
             return self::ERR_CAT_NOT_FOUND;
         }
-        // 临时错误
         if ($codeIn([500, 502, 503, 504, -1, 5000])
             || strpos($msg, 'timeout') !== false
             || strpos($msg, '超时') !== false
@@ -240,105 +192,21 @@ class FvSdk
      */
     public function __construct($config)
     {
-        $this->apiUrl = rtrim($config['api_url'] ?? '', '/');
-        $this->apiKey = $config['api_key'] ?? '';
-        $this->apiSecret = $config['api_secret'] ?? '';
-
-        if (empty($this->apiUrl) || empty($this->apiKey) || empty($this->apiSecret)) {
+        try {
+            $this->client = new FvClient($config);
+        } catch (\InvalidArgumentException $e) {
             throw new \Exception('星楼网络 API配置不完整，请检查插件配置');
         }
     }
 
     /**
-     * 生成 HMAC-SHA256 签名
-     *
-     * 签名算法：hex(HMAC-SHA256(api_secret, 原始请求体))
-     *
-     * @param string $body 原始请求体（POST 为 JSON 字符串，GET 为空字符串）
-     * @return string 小写十六进制签名
+     * 上游返回值规范化(双写字段, 兼容新旧判断逻辑)
      */
-    private function generateSign($body)
+    private static function normalize($result)
     {
-        return hash_hmac('sha256', $body, $this->apiSecret);
-    }
-
-    /**
-     * 发送HTTP请求
-     *
-     * @param string $method 请求方法 GET|POST
-     * @param string $endpoint API端点
-     * @param array $data 请求数据
-     * @return array 响应数据
-     */
-    private function request($method, $endpoint, $data = [])
-    {
-        $url = $this->apiUrl . $endpoint;
-
-        // 序列化请求体（签名与实际发送必须完全一致）
-        $body = ($method === 'POST') ? json_encode($data) : '';
-
-        // 时间戳：Unix 秒，后端校验允许 ±5 分钟
-        $timestamp = (string)time();
-        // 签名：hex(HMAC-SHA256(api_secret, 原始请求体))
-        $sign = $this->generateSign($body);
-
-        $headers = [
-            'Content-Type: application/json',
-            'X-Api-Key: ' . $this->apiKey,
-            'X-Sign: ' . $sign,
-            'X-Sign-Version: hmac_sha256',
-            'X-Timestamp: ' . $timestamp,
-        ];
-
-        $ch = curl_init();
-
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-
-        if ($method === 'POST') {
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
-        } elseif ($method === 'GET' && !empty($data)) {
-            $url .= '?' . http_build_query($data);
-            curl_setopt($ch, CURLOPT_URL, $url);
+        if (!is_array($result)) {
+            return $result;
         }
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-
-        curl_close($ch);
-
-        if ($error) {
-            return [
-                'code' => -1,
-                'message' => '网络请求失败: ' . $error
-            ];
-        }
-
-        $result = json_decode($response, true);
-
-        if (!$result) {
-            return [
-                'code' => -1,
-                'message' => 'API响应解析失败'
-            ];
-        }
-
-        if ($httpCode !== 200) {
-            return [
-                'code'    => (int)$httpCode,
-                'message' => $result['message'] ?? $result['result_message'] ?? ('HTTP错误: ' . $httpCode)
-            ];
-        }
-
-        // ------ 上游返回值规范化(双写字段, 兼容新旧判断逻辑) ------
-        // 把 顶层 result_code → code, 顶层 result_message → message
-        // 成功时(1000)额外把 code 写成 0(兼容"code=0成功"的旧判断)
         $topCode = self::pickFirst($result, ['code', 'result_code']);
         $topMsg  = self::pickFirst($result, ['message', 'result_message', 'msg'], '');
         $intCode = (int)$topCode;
@@ -352,7 +220,6 @@ class FvSdk
             $result['message'] = $topMsg;
         }
 
-        // data 里也统一双写一遍 status_code(订单状态),让上层 getStatus 直接读 data.status_code/result_code 都行
         if (is_array($result['data'] ?? null)) {
             $d = &$result['data'];
             $dc = self::pickFirst($d, ['result_code', 'code', 'status_code']);
@@ -368,34 +235,26 @@ class FvSdk
     /**
      * 创建核验订单（子产品级）
      *
-     * 调用 /v1/fv/auth（或 /v1/fv/self）。把选定的子产品服务标识(service)与身份要素
-     * 一并提交，并把下游 notify_url / return_url 回传平台。
-     *
      * @param array $params 参数
      *   - service: 平台子产品服务标识，如 fv_auth / fv_self
      *   - notify_url: 后端结果通知地址
      *   - return_url: 前端回跳地址
      *   - name / id_card: 个人实名要素
      *   - biz_extra_data: 业务扩展数据（可选）
-     *   说明: biz_no 由平台随机生成下发,无需(也不应)由下游传入。
      * @return array
      */
     public function createOrder($params)
     {
-        // 后端按 URL 区分子产品：fv_self → /v1/fv/self，其余（默认 fv_auth）→ /v1/fv/auth
-        $endpoint = '/v1/fv/auth';
-        if (($params['service'] ?? '') === 'fv_self') {
-            $endpoint = '/v1/fv/self';
-        }
+        $service = $params['service'] ?? '';
         unset($params['service']);
-        return $this->request('POST', $endpoint, $params);
+        $result = ($service === 'fv_self')
+            ? $this->client->startSelf($params)
+            : $this->client->startAuth($params);
+        return self::normalize($result);
     }
 
     /**
      * 查询/校对核验结果
-     *
-     * 调用 /v1/fv/result。既用于文档轮询查询，也用于「结果校对」：
-     * 收到平台推送后主动调用一次，对齐上游最终状态再落地本地。
      *
      * @param array $params 参数
      *   - biz_no: 全平台唯一流水号（即 createOrder 下发的 biz_no）
@@ -403,11 +262,11 @@ class FvSdk
      */
     public function queryResult($params)
     {
-        return $this->request('POST', '/v1/fv/result', $params);
+        return self::normalize($this->client->queryResult($params['biz_no'] ?? ''));
     }
 
     /**
-     * 测试API连接（不再查询余额，改为请求结果查询接口验证连通与鉴权）
+     * 测试API连接（请求结果查询接口验证连通与鉴权）
      *
      * @return array
      */

@@ -1,32 +1,24 @@
 <?php
 namespace sms\star_loft_sms_for_zjmf_mfcw\logic;
 
+require_once __DIR__ . '/sdk/Client.php';
+require_once __DIR__ . '/sdk/SmsClient.php';
+
+use StarLoft\Sdk\SmsClient;
+
 /**
- * StarLoft 星楼网络 SMS SDK
+ * StarLoft 星楼网络 SMS 插件适配层
  *
- * 用于对接「星楼网络」平台短信服务（SMS）的 SDK 类。
- * 所有请求使用 API Key + HMAC-SHA256 签名鉴权，请求头：
- *   X-Api-Key / X-Sign=hex(HMAC-SHA256(api_secret, 原始请求体)) /
- *   X-Sign-Version: hmac_sha256 / X-Timestamp
- *
- * 接口前缀统一为 /v1/sms（API 域名为 api.starloft.cn）。
+ * HTTP 通信与 HMAC-SHA256 签名由 StarLoft PHP SDK（logic/sdk/）实现，
+ * 本类保留插件侧错误分类与便捷发送逻辑。
  *
  * @author StarLoft
- * @version 3.0.0
+ * @version 3.1.0
  */
 class SmsSdk
 {
-    /** @var string API基础URL */
-    private $apiUrl;
-
-    /** @var string API Key */
-    private $apiKey;
-
-    /** @var string API Secret */
-    private $apiSecret;
-
-    /** @var int 请求超时时间（秒） */
-    private $timeout = 30;
+    /** @var SmsClient */
+    private $client;
 
     /**
      * 错误分类常量（用于上层根据语义做不同动作）
@@ -40,10 +32,6 @@ class SmsSdk
 
     /**
      * 根据接口返回判断错误分类
-     *
-     * 兼容两种返回字段:
-     *   - 规范化(code/message): SDK 在 request() 末尾会把上游 result_* 双写进来
-     *   - 原生(result_code/result_message): 上层直接拿接口返回值判断时也能走通
      */
     public static function classifyError($result)
     {
@@ -141,26 +129,11 @@ class SmsSdk
      */
     public function __construct($config)
     {
-        $this->apiUrl = rtrim($config['api_url'] ?? '', '/');
-        $this->apiKey = $config['api_key'] ?? '';
-        $this->apiSecret = $config['api_secret'] ?? '';
-
-        if (empty($this->apiUrl) || empty($this->apiKey) || empty($this->apiSecret)) {
+        try {
+            $this->client = new SmsClient($config);
+        } catch (\InvalidArgumentException $e) {
             throw new \Exception('星楼网络 SMS API配置不完整，请检查插件配置');
         }
-    }
-
-    /**
-     * 生成 HMAC-SHA256 签名
-     *
-     * 签名算法：hex(HMAC-SHA256(api_secret, 原始请求体))
-     *
-     * @param string $body 原始请求体（POST 为 JSON 字符串）
-     * @return string 小写十六进制签名
-     */
-    private function generateSign($body)
-    {
-        return hash_hmac('sha256', $body, $this->apiSecret);
     }
 
     /**
@@ -172,87 +145,7 @@ class SmsSdk
     }
 
     /**
-     * 发送HTTP请求
-     *
-     * @param string $method HTTP方法（POST/GET/PUT/DELETE）
-     * @param string $endpoint API端点
-     * @param array $data 请求数据（GET/DELETE 为空数组，签名串为空字符串）
-     * @return array 响应数据
-     */
-    private function request($method, $endpoint, array $data = [])
-    {
-        $url = $this->apiUrl . $endpoint;
-
-        // 序列化请求体（签名与实际发送必须完全一致）；GET/DELETE 无请求体
-        $method = strtoupper($method);
-        $body   = '';
-        if (in_array($method, ['POST', 'PUT'], true)) {
-            $body = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        }
-
-        // 时间戳：Unix 秒，后端校验允许 ±5 分钟
-        $timestamp = (string)time();
-        // 签名：hex(HMAC-SHA256(api_secret, 原始请求体))
-        $sign = $this->generateSign($body);
-
-        $headers = [
-            'Content-Type: application/json',
-            'X-Api-Key: ' . $this->apiKey,
-            'X-Sign: ' . $sign,
-            'X-Sign-Version: hmac_sha256',
-            'X-Timestamp: ' . $timestamp,
-        ];
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-
-        if ($method === 'POST') {
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
-        } elseif ($method === 'PUT' || $method === 'DELETE') {
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-            if ($body !== '') {
-                curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
-            }
-        } else {
-            curl_setopt($ch, CURLOPT_HTTPGET, true);
-        }
-
-        $response = curl_exec($ch);
-        $error = curl_error($ch);
-        curl_close($ch);
-
-        if ($error) {
-            return ['code' => -1, 'message' => '网络请求失败: ' . $error];
-        }
-
-        $result = json_decode((string)$response, true);
-        if (!is_array($result)) {
-            return ['code' => -1, 'message' => '响应解析失败: ' . (string)$response];
-        }
-
-        // 双写 result_* 字段，兼容上层按原生字段判断
-        $rMsg = (string)self::pickFirst($result, ['message', 'msg'], '');
-        if ($rMsg !== '' && !array_key_exists('result_message', $result)) {
-            $result['result_message'] = $rMsg;
-        }
-        $rCode = self::pickFirst($result, ['code'], null);
-        if ($rCode !== null && !array_key_exists('result_code', $result)) {
-            $result['result_code'] = $rCode;
-        }
-
-        return $result;
-    }
-
-    /**
      * 发送短信
-     *
-     * 调用 /v1/sms/send。支持模板型（template_id + template_params）与直发型（content）。
      *
      * @param array $params 参数
      *   - phone_number_set: 目标号码数组，如 ["13800138000","13900139000"]
@@ -268,7 +161,7 @@ class SmsSdk
     {
         $payload = [];
 
-        // 号码：数组 -> JSON 字符串（与平台契约一致）
+        // 号码：数组 -> 过滤空值（与平台契约一致）
         $phones = $params['phone_number_set'] ?? $params['phones'] ?? $params['mobile'] ?? [];
         if (is_string($phones)) {
             $phones = array_map('trim', explode(',', $phones));
@@ -301,7 +194,7 @@ class SmsSdk
             return ['code' => 400, 'message' => '模板ID与短信内容不能同时为空'];
         }
 
-        return $this->request('POST', '/v1/sms/send', $payload);
+        return $this->client->send($payload);
     }
 
     /**
@@ -311,7 +204,7 @@ class SmsSdk
      */
     public function createTemplate(array $data)
     {
-        return $this->request('POST', '/v1/sms/templates', $data);
+        return $this->client->createTemplate($data);
     }
 
     /**
@@ -319,7 +212,7 @@ class SmsSdk
      */
     public function getTemplate($id)
     {
-        return $this->request('GET', '/v1/sms/templates/' . rawurlencode((string)$id));
+        return $this->client->getTemplate($id);
     }
 
     /**
@@ -327,7 +220,7 @@ class SmsSdk
      */
     public function updateTemplate($id, array $data)
     {
-        return $this->request('PUT', '/v1/sms/templates/' . rawurlencode((string)$id), $data);
+        return $this->client->updateTemplate($id, $data);
     }
 
     /**
@@ -335,7 +228,7 @@ class SmsSdk
      */
     public function deleteTemplate($id)
     {
-        return $this->request('DELETE', '/v1/sms/templates/' . rawurlencode((string)$id));
+        return $this->client->deleteTemplate($id);
     }
 
     /**
