@@ -1,0 +1,7 @@
+# 插件构建产物（zip 包）与本地打包工具（exe）
+*.zip
+*.exe
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
