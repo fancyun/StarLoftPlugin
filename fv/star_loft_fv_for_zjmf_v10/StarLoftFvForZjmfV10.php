@@ -166,7 +166,7 @@ class StarLoftFvForZjmfV10
         }
 
         $bizNo   = (string)($result['data']['biz_no'] ?? '');
-        $authUrl = (string)($result['data']['auth_url'] ?? '');
+        $authUrl = (string)($result['data']['site_url'] ?? $result['data']['auth_url'] ?? '');
 
         $this->updateLocalCertiStatus($certifi, [
             'status'     => 4,
