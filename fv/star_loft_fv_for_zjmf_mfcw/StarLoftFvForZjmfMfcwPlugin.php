@@ -56,22 +56,11 @@ class StarLoftFvForZjmfMfcwPlugin extends Plugin
     }
 
     /**
-     * 前台自定义字段（仅个人实名）
+     * 前台自定义字段：姓名 / 身份证号由魔方系统实名表单自带字段收集，此处不再重复声明
      */
     public function collectionInfo($type = null)
     {
-        $titles = ['name' => '姓名', 'card' => '身份证号码'];
-        $out = [];
-        foreach ($titles as $key => $title) {
-            $out[$key] = [
-                'title'    => $title,
-                'type'     => 'text',
-                'value'    => '',
-                'tip'      => '',
-                'required' => true,
-            ];
-        }
-        return $out;
+        return [];
     }
 
     public function install()
@@ -572,25 +561,51 @@ class StarLoftFvForZjmfMfcwPlugin extends Plugin
     // =========================================================
     protected function buildAuthHtml($authUrl)
     {
-        $url = htmlspecialchars($authUrl, ENT_QUOTES, 'UTF-8');
+        $url     = htmlspecialchars($authUrl, ENT_QUOTES, 'UTF-8');
+        $urlJson = json_encode($authUrl, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $qr      = htmlspecialchars($this->buildQrImageUrl($authUrl), ENT_QUOTES, 'UTF-8');
         return <<<HTML
 <div class="kyc-auth-container" style="text-align: center; padding: 20px;">
-    <h5 class="pt-2 font-weight-bold h5 py-4">正在跳转到人脸核验页面...</h5>
-    <p>如果页面未自动跳转,请点击下方按钮(<b>请勿反复刷新或多次点击</b>,以免重复创建核验任务扣费)</p>
+    <h5 class="pt-2 font-weight-bold h5 py-4">请使用手机扫码完成人脸核验</h5>
+    <div class="kyc-qr" style="display: none; margin-bottom: 12px;">
+        <img src="{$qr}" alt="人脸核验二维码" style="width: 240px; height: 240px;">
+        <p class="text-muted small">请使用手机微信 / 浏览器扫码(<b>请勿反复刷新或多次点击</b>,以免重复创建核验任务扣费)</p>
+    </div>
+    <p class="text-muted small">无法扫码时,可点击下方按钮在新窗口完成核验</p>
     <a href="{$url}" class="btn btn-primary" target="_blank">前往认证</a>
 </div>
 <script>
 (function(){
-    var opened = false;
-    function tryOpen(){ if(!opened){ opened=true; window.open('{$url}', '_blank'); } }
-    setTimeout(tryOpen, 800);
-    document.addEventListener && document.addEventListener('click', function once(){
-        tryOpen();
-        document.removeEventListener('click', once);
-    }, {once:true});
+    var url    = {$urlJson};
+    var mobile = /Android|iPhone|iPad|iPod|Mobile|MicroMessenger/i.test(navigator.userAgent || '');
+    if (mobile) { window.location.href = url; return; }
+    var qr = document.querySelector('.kyc-qr');
+    var img = qr ? qr.querySelector('img') : null;
+    if (img && img.getAttribute('src')) { qr.style.display = 'block'; }
 })();
 </script>
 HTML;
+    }
+
+    /**
+     * 由核验承接页地址推导二维码图片地址
+     *
+     * 二维码由平台公开接口 {console 站点}/console/qr 渲染；白标场景按固定子域前缀
+     * 由 service.{域名} 推导 console.{域名}，推导失败返回空串（页面回落为跳转按钮）。
+     */
+    protected function buildQrImageUrl($authUrl)
+    {
+        $parts = parse_url($authUrl);
+        if (!is_array($parts) || empty($parts['host'])) {
+            return '';
+        }
+        $scheme = (string)($parts['scheme'] ?? 'https');
+        $host   = (string)$parts['host'];
+        if (strpos($host, 'service.') === 0) {
+            $host = 'console.' . substr($host, strlen('service.'));
+        }
+        $port = isset($parts['port']) ? ':' . (int)$parts['port'] : '';
+        return $scheme . '://' . $host . $port . '/console/qr?size=280&data=' . rawurlencode($authUrl);
     }
 
     protected function failHtml($msg)
