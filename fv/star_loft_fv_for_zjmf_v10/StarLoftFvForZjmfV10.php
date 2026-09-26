@@ -167,7 +167,7 @@ class StarLoftFvForZjmfV10
         if ($authUrl === '') {
             return $this->continuePollHtml($bizNo, '人脸核验请求已提交,正在等待平台返回结果...');
         }
-        return $this->buildAuthHtml($authUrl);
+        return $this->buildAuthHtml($authUrl, $bizNo);
     }
 
     /**
@@ -234,7 +234,7 @@ class StarLoftFvForZjmfV10
         try {
             $config = $this->getPluginConfig();
             $sdk    = new FvSdk($config);
-            $result = $sdk->queryResult(['biz_no' => $certifyId]);
+            $result = $sdk->queryResult(['biz_no' => $certifyId, 'sync' => $this->resolveSyncFlag($certifi)]);
             $cat    = FvSdk::classifyError($result);
 
             if ($cat === FvSdk::ERR_CAT_SUCCESS) {
@@ -599,6 +599,16 @@ class StarLoftFvForZjmfV10
         return '';
     }
 
+    /**
+     * 本次查询是否为「手动查询」（用户点击「我已完成扫脸」）：是则要求平台立即校对一次上游结果。
+     * 记录已是终态时平台不会再请求上游，只返回本地已落地的结果。
+     */
+    protected function resolveSyncFlag($certifi)
+    {
+        $raw = $_POST['sync'] ?? $_GET['sync'] ?? (is_array($certifi) ? ($certifi['sync'] ?? 0) : 0);
+        return (int)$raw === 1 ? 1 : 0;
+    }
+
     protected function resolveCurrentUid($certifi = [])
     {
         $uid = 0;
@@ -716,11 +726,16 @@ class StarLoftFvForZjmfV10
     // =========================================================
     // 辅助：通用 HTML 输出
     // =========================================================
-    protected function buildAuthHtml($authUrl)
+    /**
+     * 核验发起页：PC 展示二维码、移动端直接跳转承接页；
+     * 页面轮询核验状态，用户点击「我已完成扫脸」时要求平台立即校对一次上游结果
+     */
+    protected function buildAuthHtml($authUrl, $bizNo)
     {
-        $url     = htmlspecialchars($authUrl, ENT_QUOTES, 'UTF-8');
-        $urlJson = json_encode($authUrl, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        $qr      = htmlspecialchars($this->buildQrImageUrl($authUrl), ENT_QUOTES, 'UTF-8');
+        $url      = htmlspecialchars($authUrl, ENT_QUOTES, 'UTF-8');
+        $urlJson  = json_encode($authUrl, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $qr       = htmlspecialchars($this->buildQrImageUrl($authUrl), ENT_QUOTES, 'UTF-8');
+        $certJson = json_encode((string)$bizNo);
         return <<<HTML
 <div class="kyc-auth-container" style="text-align: center; padding: 20px;">
     <h5 class="pt-2 font-weight-bold h5 py-4">请使用手机扫码完成人脸核验</h5>
@@ -728,17 +743,61 @@ class StarLoftFvForZjmfV10
         <img src="{$qr}" alt="人脸核验二维码" style="width: 240px; height: 240px;">
         <p class="text-muted small">请使用手机微信 / 浏览器扫码(<b>请勿反复刷新或多次点击</b>,以免重复创建核验任务扣费)</p>
     </div>
-    <p class="text-muted small">无法扫码时,可点击下方按钮在新窗口完成核验</p>
-    <a href="{$url}" class="btn btn-primary" target="_blank">前往认证</a>
+    <p class="text-muted small">扫码完成人脸核验后,点击下方按钮查询结果</p>
+    <button type="button" id="kyc-done-btn" class="btn btn-primary" style="width:100%;">我已完成扫脸</button>
+    <p class="text-muted small" id="kyc-poll-tip" style="display:none;margin-top:10px;margin-bottom:0;">正在查询核验结果...</p>
 </div>
 <script>
 (function(){
-    var url    = {$urlJson};
-    var mobile = /Android|iPhone|iPad|iPod|Mobile|MicroMessenger/i.test(navigator.userAgent || '');
+    var url      = {$urlJson};
+    var certId   = {$certJson};
+    var endpoint = '/certification/star_loft_fv_for_zjmf_v10/index/status';
+    var mobile   = /Android|iPhone|iPad|iPod|Mobile|MicroMessenger/i.test(navigator.userAgent || '');
     if (mobile) { window.location.href = url; return; }
-    var qr = document.querySelector('.kyc-qr');
+
+    var qr  = document.querySelector('.kyc-qr');
     var img = qr ? qr.querySelector('img') : null;
     if (img && img.getAttribute('src')) { qr.style.display = 'block'; }
+
+    var btn = document.getElementById('kyc-done-btn');
+    var tip = document.getElementById('kyc-poll-tip');
+    var stopped = false, inFlight = false, ticks = 0, maxTicks = 200;
+
+    var handle = function(resp){
+        inFlight = false;
+        try {
+            var d = (typeof resp === 'string') ? JSON.parse(resp) : resp;
+            if (d && (d.status === 1 || d.status === 2)) { stopped = true; location.reload(); return; }
+        } catch (e) {}
+        ticks++;
+        if (ticks >= maxTicks) { stopped = true; return; }
+        setTimeout(function(){ query(false); }, 3000);
+    };
+    var query = function(sync){
+        if (stopped || inFlight || !certId) return;
+        inFlight = true;
+        if (tip) tip.style.display = 'block';
+        var body = 'certif_id=' + encodeURIComponent(certId) + (sync ? '&sync=1' : '');
+        if (typeof window.jQuery !== 'undefined' && typeof window.jQuery.ajax === 'function') {
+            window.jQuery.ajax({ url: endpoint, type: 'POST', dataType: 'json', data: body,
+                success: handle, error: function(){ handle(''); } });
+            return;
+        }
+        var x = new XMLHttpRequest();
+        x.open('POST', endpoint, true);
+        x.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded;charset=UTF-8');
+        x.onload  = function(){ handle(x.responseText); };
+        x.onerror = function(){ handle(''); };
+        x.send(body);
+    };
+    if (btn) {
+        btn.addEventListener('click', function(){
+            btn.disabled = true;
+            setTimeout(function(){ btn.disabled = false; }, 3000);
+            query(true);
+        });
+    }
+    setTimeout(function(){ query(false); }, 3000);
 })();
 </script>
 HTML;

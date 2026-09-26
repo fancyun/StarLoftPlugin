@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 namespace certification\star_loft_fv_for_zjmf_v10\logic;
 
 require_once __DIR__ . '/sdk/Client.php';
@@ -256,13 +256,17 @@ class FvSdk
     /**
      * 查询/校对核验结果
      *
-     * @param array $params 参数
+     * @param array $params
      *   - biz_no: 全平台唯一流水号（即 createOrder 下发的 biz_no）
+     *   - sync:   1=立即校对一次（用户点击「我已完成扫脸」后的手动查询），0=普通轮询
      * @return array
      */
     public function queryResult($params)
     {
-        return self::normalize($this->client->queryResult($params['biz_no'] ?? ''));
+        return self::normalize($this->client->queryResult(
+            $params['biz_no'] ?? '',
+            (int)($params['sync'] ?? 0)
+        ));
     }
 
     /**

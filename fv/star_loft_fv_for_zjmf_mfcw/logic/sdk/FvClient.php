@@ -74,10 +74,15 @@ class FvClient
      * 查询认证记录状态
      *
      * @param string $bizNo 全平台唯一流水号
+     * @param int    $sync  1=立即校对一次（用户点击「我已完成扫脸」后的手动查询），0=普通轮询
      * @return array {code, message, data:{biz_no, status, result_code, result_message}}
      */
-    public function queryResult($bizNo)
+    public function queryResult($bizNo, $sync = 0)
     {
-        return $this->client->request('POST', '/v1/fv/result', ['biz_no' => $bizNo]);
+        $payload = ['biz_no' => $bizNo];
+        if ((int)$sync === 1) {
+            $payload['sync'] = 1;
+        }
+        return $this->client->request('POST', '/v1/fv/result', $payload);
     }
 }
