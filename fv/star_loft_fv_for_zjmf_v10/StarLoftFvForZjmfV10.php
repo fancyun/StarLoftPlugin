@@ -67,22 +67,16 @@ class StarLoftFvForZjmfV10
     }
 
     /**
-     * 前台自定义字段（仅个人实名）
+     * 前台自定义字段：不声明任何字段（返回空数组）。
+     *
+     * 智简魔方业务系统 v10 的人脸实名表单已自带「真实姓名 / 证件类型 / 身份证类型 / 证件号码」，
+     * 提交键即 name / card / card_type（见 StarLoftFvForZjmfV10Person() 的取值）。
+     * 此处若再声明「姓名 / 身份证号码」，宿主会在表单上追加两个字段，
+     * 出现「姓名 + 真实姓名」「身份证号码 + 证件号码」两组重复输入框。
      */
     public function StarLoftFvForZjmfV10CollectionInfo($type)
     {
-        $titles = ['name' => '姓名', 'card' => '身份证号码'];
-        $out = [];
-        foreach ($titles as $key => $title) {
-            $out[$key] = [
-                'title'    => $title,
-                'type'     => 'text',
-                'value'    => '',
-                'tip'      => '',
-                'required' => true,
-            ];
-        }
-        return $out;
+        return [];
     }
 
     /**
