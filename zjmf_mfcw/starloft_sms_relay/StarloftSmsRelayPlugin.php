@@ -15,7 +15,8 @@ use addons\starloft_sms_relay\logic\Relay;
  *
  * 端点：
  *   - 中转：/addons/starloft_sms_relay/apiRelay?endpoint=sms/send
- *   - 管理：/addons/starloft_sms_relay/apiAdmin?token=xxx
+ *   - 管理：后台插件菜单「StarLoft 短信中转 → 管理控制台」（menu.php 指向 controller/IndexController::console）
+ *   - 免登录管理页：/addons/starloft_sms_relay/apiAdmin?token=xxx
  *
  * @author StarLoft
  * @version 1.0.0
@@ -64,7 +65,7 @@ class StarloftSmsRelayPlugin extends Plugin
 <div style="line-height:1.8;color:#333;">
     <p><b>StarLoft 短信中转</b></p>
     <p>站点把 StarLoft 的短信 API 转售给自有客户：在管理页为每个客户生成一对中转密钥，客户用该密钥调用本站点中转端点，插件用本页配置的平台密钥转发到星楼网络。</p>
-    <p><b>管理页：</b><code>/addons/starloft_sms_relay/apiAdmin?token=你的管理令牌</code>（令牌在插件配置里设置）</p>
+    <p><b>管理页：</b>后台「插件 → StarLoft 短信中转 → 管理控制台」；也可用免登录地址 <code>/addons/starloft_sms_relay/apiAdmin?token=你的管理令牌</code>（令牌在插件配置里设置）</p>
     <p><b>中转端点：</b><code>/addons/starloft_sms_relay/apiRelay?endpoint=sms/send</code>，请求头与签名方式与星楼网络 API 一致，密钥换成客户的中转密钥。</p>
     <p>注意：客户调用消耗的是本站点平台账号的余额/资源包；短信需平台账号完成个人实名。</p>
 </div>
@@ -87,6 +88,14 @@ HTML;
     public function apiAdmin()
     {
         Admin::render($this->getPluginConfig());
+    }
+
+    /**
+     * 供后台管理面板控制器读取本插件配置（单价、平台地址与密钥、管理令牌等）
+     */
+    public function pluginConfig()
+    {
+        return $this->getPluginConfig();
     }
 
     /**

@@ -14,7 +14,8 @@ use addon\starloft_fv_relay\logic\Relay;
  *
  * 端点（v10 走 controller/IndexController.php 暴露）：
  *   - 中转：/addon/starloft_fv_relay/index/apiRelay?endpoint=fv/auth
- *   - 管理：/addon/starloft_fv_relay/index/apiAdmin?token=xxx
+ *   - 管理：后台「插件 → StarLoft 人脸中转」（template/admin/index.php）
+ *   - 免登录管理页：/addon/starloft_fv_relay/index/apiAdmin?token=xxx
  *
  * @author StarLoft
  * @version 1.0.0
@@ -33,9 +34,6 @@ class StarloftFvRelay
         'version'     => '1.0.0',
         'help_url'    => 'https://docs.starloft.cn/relay/plugin/starloft_fv_relay',
     ];
-
-    /** 本插件为纯接口中转，不注册客户端默认导航（官方约定：定义 noNav 即不生成默认导航） */
-    public $noNav;
 
     /**
      * 安装：创建客户密钥表与调用日志表（幂等）

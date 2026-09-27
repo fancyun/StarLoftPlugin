@@ -15,7 +15,7 @@
 
 ## 3. 发密钥
 
-打开管理页（`token` 换成你的管理令牌）：
+打开管理页：**后台「插件」菜单下本插件的入口**，或用下面的免登录地址（`token` 换成你的管理令牌）：
 
 ```
 https://你的站点/addon/starloft_sms_relay/index/apiAdmin?token=你的管理令牌
