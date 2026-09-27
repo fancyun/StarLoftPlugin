@@ -119,13 +119,6 @@ class Relay
         }
 
         $path = (string)$rule['path'];
-        if (!empty($rule['needs_id'])) {
-            $id = trim((string)($_GET['id'] ?? ''));
-            if ($id === '' || !ctype_digit($id)) {
-                self::reject($ctx, $client, 400, '缺少合法的 id 参数（?endpoint=sms/templates/:id&id=123）');
-            }
-            $path = sprintf($path, $id);
-        }
 
         // 预扣：余额不足直接拒绝；扣费本身出错按系统错误报
         list($units, , $cost) = self::estimate($endpoint, $body, $cfg);
