@@ -1,5 +1,5 @@
 <?php
-namespace certification\star_loft_api\logic;
+namespace certification\starloft_api\logic;
 
 /**
  * 客户中转密钥、预付余额与调用日志的存取
@@ -10,10 +10,10 @@ namespace certification\star_loft_api\logic;
 class KeyStore
 {
     /** 客户中转密钥表（不含表前缀） */
-    const KEY_TABLE = 'star_loft_api_key';
+    const KEY_TABLE = 'starloft_api_key';
 
     /** 调用日志表（不含表前缀） */
-    const LOG_TABLE = 'star_loft_api_log';
+    const LOG_TABLE = 'starloft_api_log';
 
     /**
      * 带表前缀的真实表名（ThinkPHP 前缀优先从 Query 取，其次读配置）

@@ -1,5 +1,5 @@
 <?php
-namespace certification\star_loft_api\logic;
+namespace certification\starloft_api\logic;
 
 /**
  * API 中转（含计费）

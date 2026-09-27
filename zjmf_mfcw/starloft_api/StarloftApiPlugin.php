@@ -1,10 +1,10 @@
 <?php
-namespace certification\star_loft_api;
+namespace certification\starloft_api;
 
 use app\admin\lib\Plugin;
-use certification\star_loft_api\logic\Admin;
-use certification\star_loft_api\logic\KeyStore;
-use certification\star_loft_api\logic\Relay;
+use certification\starloft_api\logic\Admin;
+use certification\starloft_api\logic\KeyStore;
+use certification\starloft_api\logic\Relay;
 
 /**
  * StarLoft API 中转插件（智简魔方财务版）
@@ -14,25 +14,25 @@ use certification\star_loft_api\logic\Relay;
  * 用站点配置的平台密钥转发到 StarLoft，并原样回传响应、按客户记录调用日志。
  *
  * 端点：
- *   - 中转：/{分类}/star_loft_api/apiRelay?endpoint=sms/send
- *   - 管理：/{分类}/star_loft_api/apiAdmin?token=xxx
+ *   - 中转：/{分类}/starloft_api/apiRelay?endpoint=sms/send
+ *   - 管理：/{分类}/starloft_api/apiAdmin?token=xxx
  *
  * @author StarLoft
  * @version 1.0.0
  */
-class StarLoftApiPlugin extends Plugin
+class StarloftApiPlugin extends Plugin
 {
     /**
      * 插件基本信息（name 为类名去掉 Plugin，作为魔方插件唯一标识）
      */
     public $info = [
-        'name'        => 'StarLoftApi',
+        'name'        => 'StarloftApi',
         'title'       => 'StarLoft API 中转',
         'description' => '把 StarLoft 短信/人脸核验 API 转售给站点客户：客户独立密钥、站点中转、调用日志 — 智简魔方财务版',
         'status'      => 1,
         'author'      => 'StarLoft',
         'version'     => '1.0.0',
-        'help_url'    => 'https://docs.starloft.cn/relay/plugin/star_loft_api',
+        'help_url'    => 'https://docs.starloft.cn/relay/plugin/starloft_api',
     ];
 
     /**
@@ -44,7 +44,7 @@ class StarLoftApiPlugin extends Plugin
     {
         $error = null;
         if (!KeyStore::ensureTables($error) && function_exists('trace')) {
-            trace('StarLoftApi 建表失败: ' . (string)$error, 'error');
+            trace('StarloftApi 建表失败: ' . (string)$error, 'error');
         }
         return true;
     }
@@ -63,15 +63,15 @@ class StarLoftApiPlugin extends Plugin
 <div style="line-height:1.8;color:#333;">
     <p><b>StarLoft API 中转</b></p>
     <p>站点把 StarLoft 的短信/人脸核验 API 转售给自有客户：在管理页为每个客户生成一对中转密钥，客户用该密钥调用本站点中转端点，插件用本页配置的平台密钥转发到星楼网络。</p>
-    <p><b>管理页：</b><code>/{分类}/star_loft_api/apiAdmin?token=你的管理令牌</code>（令牌在插件配置里设置）</p>
-    <p><b>中转端点：</b><code>/{分类}/star_loft_api/apiRelay?endpoint=sms/send</code>，请求头与签名方式与星楼网络 API 一致，密钥换成客户的中转密钥。</p>
+    <p><b>管理页：</b><code>/{分类}/starloft_api/apiAdmin?token=你的管理令牌</code>（令牌在插件配置里设置）</p>
+    <p><b>中转端点：</b><code>/{分类}/starloft_api/apiRelay?endpoint=sms/send</code>，请求头与签名方式与星楼网络 API 一致，密钥换成客户的中转密钥。</p>
     <p>注意：客户调用消耗的是本站点平台账号的余额/资源包；人脸核验需平台账号完成企业实名，短信需个人实名。</p>
 </div>
 HTML;
     }
 
     /**
-     * 中转入口（客户调用）：/{分类}/star_loft_api/apiRelay?endpoint=sms/send
+     * 中转入口（客户调用）：/{分类}/starloft_api/apiRelay?endpoint=sms/send
      *
      * 方法名加 api 前缀以避免与框架 Plugin 基类的同名钩子冲突。
      */
@@ -81,7 +81,7 @@ HTML;
     }
 
     /**
-     * 管理页（站点管理员使用，用配置里的管理令牌保护）：/{分类}/star_loft_api/apiAdmin?token=xxx
+     * 管理页（站点管理员使用，用配置里的管理令牌保护）：/{分类}/starloft_api/apiAdmin?token=xxx
      */
     public function apiAdmin()
     {

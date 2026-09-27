@@ -1,8 +1,8 @@
-# 快速开始（StarLoft API 中转 · 智简魔方财务版）
+# 快速开始（StarLoft API 中转 · 智简魔方业务系统 v10）
 
 ## 1. 装
 
-1. 上传 `star_loft_api` 到 `/public/plugins/certification/star_loft_api/`
+1. 上传 `starloft_api` 到 `/public/plugins/certification/starloft_api/`
 2. 后台插件管理 → 「StarLoft API 中转」→ 安装 → 配置
 
 ## 2. 配
@@ -18,7 +18,7 @@
 打开管理页（`token` 换成你的管理令牌）：
 
 ```
-https://你的站点/certification/star_loft_api/apiAdmin?token=你的管理令牌
+https://你的站点/certification/starloft_api/index/apiAdmin?token=你的管理令牌
 ```
 
 「新建客户密钥」填客户名称 → 生成后**立即复制 Secret**（只显示一次）交给客户。客户欠费或泄露时用「停用 / 重置密钥」。
@@ -28,7 +28,7 @@ https://你的站点/certification/star_loft_api/apiAdmin?token=你的管理令�
 ## 4. 客户怎么调
 
 ```
-POST https://你的站点/certification/star_loft_api/apiRelay?endpoint=sms/send
+POST https://你的站点/certification/starloft_api/index/apiRelay?endpoint=sms/send
 ```
 
 请求头（与平台一致，密钥换成中转密钥）：
@@ -48,7 +48,7 @@ X-Timestamp: Unix 秒（±300 秒内）
 B='{"biz_no":0}'
 TS=$(date +%s)
 SIG=$(printf '%s' "$B" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')
-curl -sS -X POST "https://你的站点/certification/star_loft_api/apiRelay?endpoint=fv/result" \
+curl -sS -X POST "https://你的站点/certification/starloft_api/index/apiRelay?endpoint=fv/result" \
   -H "Content-Type: application/json" -H "X-Api-Key: $KEY" -H "X-Sign: $SIG" \
   -H "X-Sign-Version: hmac_sha256" -H "X-Timestamp: $TS" -d "$B"
 ```
@@ -66,6 +66,6 @@ curl -sS -X POST "https://你的站点/certification/star_loft_api/apiRelay?endp
 - 客户调用**消耗站点平台账号的余额/资源包**，注意额度
 - 人脸端点要求平台账号**企业实名**，短信要求**个人实名**
 - 人脸核身链接与异步回调都由平台直接下发/回调，客户需自备可达的 `notify_url`
-- 想直接复用官方 SDK：站点 Nginx 加一条 `rewrite ^/v1/(.*)$ /certification/star_loft_api/apiRelay?endpoint=$1 last;`，客户只改 `api_url` 与密钥
+- 想直接复用官方 SDK：站点 Nginx 加一条 `rewrite ^/v1/(.*)$ /certification/starloft_api/index/apiRelay?endpoint=$1 last;`，客户只改 `api_url` 与密钥
 
 完整说明见 [README.md](./README.md)。

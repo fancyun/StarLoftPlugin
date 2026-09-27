@@ -1,9 +1,9 @@
 <?php
-namespace certification\star_loft_api;
+namespace certification\starloft_api;
 
-use certification\star_loft_api\logic\Admin;
-use certification\star_loft_api\logic\KeyStore;
-use certification\star_loft_api\logic\Relay;
+use certification\starloft_api\logic\Admin;
+use certification\starloft_api\logic\KeyStore;
+use certification\starloft_api\logic\Relay;
 
 /**
  * StarLoft API 中转插件（智简魔方业务系统 v10）
@@ -13,25 +13,25 @@ use certification\star_loft_api\logic\Relay;
  * 用站点配置的平台密钥转发到 StarLoft，并原样回传响应、按客户记录调用日志。
  *
  * 端点（v10 走 controller/IndexController.php 暴露）：
- *   - 中转：/{分类}/star_loft_api/index/apiRelay?endpoint=sms/send
- *   - 管理：/{分类}/star_loft_api/index/apiAdmin?token=xxx
+ *   - 中转：/{分类}/starloft_api/index/apiRelay?endpoint=sms/send
+ *   - 管理：/{分类}/starloft_api/index/apiAdmin?token=xxx
  *
  * @author StarLoft
  * @version 1.0.0
  */
-class StarLoftApi
+class StarloftApi
 {
     /**
      * 插件基本信息
      */
     public $info = [
-        'name'        => 'StarLoftApi',
+        'name'        => 'StarloftApi',
         'title'       => 'StarLoft API 中转',
         'description' => '把 StarLoft 短信/人脸核验 API 转售给站点客户：客户独立密钥、站点中转、调用日志 — 智简魔方业务系统 v10',
         'status'      => 1,
         'author'      => 'StarLoft',
         'version'     => '1.0.0',
-        'help_url'    => 'https://docs.starloft.cn/relay/plugin/star_loft_api',
+        'help_url'    => 'https://docs.starloft.cn/relay/plugin/starloft_api',
     ];
 
     /**
@@ -43,7 +43,7 @@ class StarLoftApi
     {
         $error = null;
         if (!KeyStore::ensureTables($error) && function_exists('trace')) {
-            trace('StarLoftApi 建表失败: ' . (string)$error, 'error');
+            trace('StarloftApi 建表失败: ' . (string)$error, 'error');
         }
         return true;
     }
@@ -54,7 +54,7 @@ class StarLoftApi
     }
 
     /**
-     * 中转入口（客户调用，由控制器转调）：/{分类}/star_loft_api/index/apiRelay?endpoint=sms/send
+     * 中转入口（客户调用，由控制器转调）：/{分类}/starloft_api/index/apiRelay?endpoint=sms/send
      */
     public function apiRelay()
     {
@@ -72,17 +72,17 @@ class StarLoftApi
     /**
      * 实名认证接口占位：本插件挂在实名认证分类下只为被魔方识别，不提供实名核验能力
      */
-    public function StarLoftApiCollectionInfo($type)
+    public function StarloftApiCollectionInfo($type)
     {
         return [];
     }
 
-    public function StarLoftApiPerson($certifi)
+    public function StarloftApiPerson($certifi)
     {
         return $this->notCertificationProvider();
     }
 
-    public function StarLoftApiCompany($certifi)
+    public function StarloftApiCompany($certifi)
     {
         return $this->notCertificationProvider();
     }

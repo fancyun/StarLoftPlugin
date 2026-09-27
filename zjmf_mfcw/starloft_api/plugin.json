@@ -1,14 +1,15 @@
 {
     "name": "StarLoft API 中转",
     "version": "1.0.0",
-    "description": "把 StarLoft 短信/人脸核验 API 转售给站点客户：客户独立密钥、站点中转、调用日志（智简魔方业务系统 v10）。",
+    "description": "把 StarLoft 短信/人脸核验 API 转售给站点客户：客户独立密钥、站点中转、调用日志（智简魔方财务版）。",
     "author": "StarLoft",
     "website": "https://docs.starloft.cn/relay/plugin",
     "plugin_type": "certification",
-    "dir": "star_loft_api",
-    "namespace": "certification\\star_loft_api",
-    "class": "StarLoftApi",
+    "dir": "starloft_api",
+    "namespace": "certification\\starloft_api",
+    "class": "StarloftApiPlugin",
     "requires": {
+        "zjmf_version": ">=3.7.6",
         "php_version": ">=7.0",
         "extensions": [
             "curl",
