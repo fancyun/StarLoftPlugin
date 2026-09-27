@@ -1,5 +1,5 @@
 <?php
-namespace certification\starloft_api\logic;
+namespace addons\starloft_api\logic;
 
 /**
  * 客户中转密钥、预付余额与调用日志的存取

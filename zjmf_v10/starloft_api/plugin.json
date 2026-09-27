@@ -4,9 +4,9 @@
     "description": "把 StarLoft 短信/人脸核验 API 转售给站点客户：客户独立密钥、站点中转、调用日志（智简魔方业务系统 v10）。",
     "author": "StarLoft",
     "website": "https://docs.starloft.cn/relay/plugin",
-    "plugin_type": "certification",
+    "plugin_type": "addon",
     "dir": "starloft_api",
-    "namespace": "certification\\starloft_api",
+    "namespace": "addon\\starloft_api",
     "class": "StarloftApi",
     "requires": {
         "php_version": ">=7.0",

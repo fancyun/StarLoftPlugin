@@ -1,9 +1,9 @@
 <?php
-namespace certification\starloft_api;
+namespace addon\starloft_api;
 
-use certification\starloft_api\logic\Admin;
-use certification\starloft_api\logic\KeyStore;
-use certification\starloft_api\logic\Relay;
+use addon\starloft_api\logic\Admin;
+use addon\starloft_api\logic\KeyStore;
+use addon\starloft_api\logic\Relay;
 
 /**
  * StarLoft API 中转插件（智简魔方业务系统 v10）
@@ -13,8 +13,8 @@ use certification\starloft_api\logic\Relay;
  * 用站点配置的平台密钥转发到 StarLoft，并原样回传响应、按客户记录调用日志。
  *
  * 端点（v10 走 controller/IndexController.php 暴露）：
- *   - 中转：/{分类}/starloft_api/index/apiRelay?endpoint=sms/send
- *   - 管理：/{分类}/starloft_api/index/apiAdmin?token=xxx
+ *   - 中转：/addon/starloft_api/index/apiRelay?endpoint=sms/send
+ *   - 管理：/addon/starloft_api/index/apiAdmin?token=xxx
  *
  * @author StarLoft
  * @version 1.0.0
@@ -33,6 +33,9 @@ class StarloftApi
         'version'     => '1.0.0',
         'help_url'    => 'https://docs.starloft.cn/relay/plugin/starloft_api',
     ];
+
+    /** 本插件为纯接口中转，不注册客户端默认导航（官方约定：定义 noNav 即不生成默认导航） */
+    public $noNav;
 
     /**
      * 安装：创建客户密钥表与调用日志表（幂等）
@@ -54,7 +57,7 @@ class StarloftApi
     }
 
     /**
-     * 中转入口（客户调用，由控制器转调）：/{分类}/starloft_api/index/apiRelay?endpoint=sms/send
+     * 中转入口（客户调用，由控制器转调）：/addon/starloft_api/index/apiRelay?endpoint=sms/send
      */
     public function apiRelay()
     {
@@ -67,30 +70,6 @@ class StarloftApi
     public function apiAdmin()
     {
         Admin::render($this->getPluginConfig());
-    }
-
-    /**
-     * 实名认证接口占位：本插件挂在实名认证分类下只为被魔方识别，不提供实名核验能力
-     */
-    public function StarloftApiCollectionInfo($type)
-    {
-        return [];
-    }
-
-    public function StarloftApiPerson($certifi)
-    {
-        return $this->notCertificationProvider();
-    }
-
-    public function StarloftApiCompany($certifi)
-    {
-        return $this->notCertificationProvider();
-    }
-
-    protected function notCertificationProvider()
-    {
-        return '<h3 class="pt-2 font-weight-bold h2 py-4" style="color:#f56c6c;">'
-            . '本插件用于 API 中转，请勿在实名认证设置中选择本插件</h3>';
     }
 
     /**

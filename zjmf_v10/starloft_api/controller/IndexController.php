@@ -1,14 +1,14 @@
 <?php
-namespace certification\starloft_api\controller;
+namespace addon\starloft_api\controller;
 
-use certification\starloft_api\StarloftApi;
+use addon\starloft_api\StarloftApi;
 
 /**
  * StarLoft API 中转插件 - 外部访问控制器（智简魔方业务系统 v10）
  *
  * 访问地址：
- *   - 中转端点: {域名}/{分类}/starloft_api/index/apiRelay?endpoint=sms/send
- *   - 管理页:   {域名}/{分类}/starloft_api/index/apiAdmin?token=xxx
+ *   - 中转端点: {域名}/addon/starloft_api/index/apiRelay?endpoint=sms/send
+ *   - 管理页:   {域名}/addon/starloft_api/index/apiAdmin?token=xxx
  *
  * 中转为原始 HTTP 输出（原样回传平台响应），不走框架页面渲染。
  *
