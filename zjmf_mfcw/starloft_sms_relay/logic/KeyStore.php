@@ -138,13 +138,46 @@ class KeyStore
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='StarLoft 短信中转-调用日志'";
     }
 
+    /** 把多行结果统一成数组（ThinkPHP 的 select() 返回的是集合对象，不是数组） */
+    protected static function rows($rows)
+    {
+        if (is_array($rows)) {
+            return $rows;
+        }
+        if ($rows instanceof \Traversable) {
+            return iterator_to_array($rows, false);
+        }
+        if (is_object($rows) && method_exists($rows, 'toArray')) {
+            return (array)$rows->toArray();
+        }
+        return [];
+    }
+
+    /** 把单行结果统一成数组（find() 可能返回集合对象，未命中返回 null） */
+    protected static function row($row)
+    {
+        if ($row === null || $row === false) {
+            return null;
+        }
+        if (is_array($row)) {
+            return $row;
+        }
+        if (is_object($row) && method_exists($row, 'toArray')) {
+            return (array)$row->toArray();
+        }
+        if ($row instanceof \Traversable) {
+            return iterator_to_array($row, false);
+        }
+        return null;
+    }
+
     /** 表已存在的列（名字转小写） */
     protected static function columnsOf($table)
     {
         $cols = [];
         try {
-            $raw = \think\Db::query('SHOW COLUMNS FROM `' . self::table($table) . '`');
-            foreach ((array)$raw as $row) {
+            $raw = self::rows(\think\Db::query('SHOW COLUMNS FROM `' . self::table($table) . '`'));
+            foreach ($raw as $row) {
                 $name = (string)($row['Field'] ?? ($row['field'] ?? ''));
                 if ($name !== '') {
                     $cols[strtolower($name)] = true;
@@ -159,19 +192,19 @@ class KeyStore
     /** 全部客户密钥（按 id 倒序） */
     public static function listKeys()
     {
-        return \think\Db::name(self::KEY_TABLE)->order('id', 'desc')->select();
+        return self::rows(\think\Db::name(self::KEY_TABLE)->order('id', 'desc')->select());
     }
 
     /** 按中转密钥取值 */
     public static function getByAccessKey($accessKey)
     {
-        return \think\Db::name(self::KEY_TABLE)->where('access_key', (string)$accessKey)->find();
+        return self::row(\think\Db::name(self::KEY_TABLE)->where('access_key', (string)$accessKey)->find());
     }
 
     /** 按主键取值 */
     public static function getById($id)
     {
-        return \think\Db::name(self::KEY_TABLE)->where('id', (int)$id)->find();
+        return self::row(\think\Db::name(self::KEY_TABLE)->where('id', (int)$id)->find());
     }
 
     /**
@@ -344,7 +377,7 @@ class KeyStore
     public static function recentLogs($limit = 50)
     {
         try {
-            return \think\Db::name(self::LOG_TABLE)->order('id', 'desc')->limit((int)$limit)->select();
+            return self::rows(\think\Db::name(self::LOG_TABLE)->order('id', 'desc')->limit((int)$limit)->select());
         } catch (\Throwable $_) {
             return [];
         }
