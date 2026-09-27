@@ -1,5 +1,5 @@
 <?php
-namespace addon\star_loft_api\logic;
+namespace certification\star_loft_api\logic;
 
 /**
  * 插件自带的极简管理页

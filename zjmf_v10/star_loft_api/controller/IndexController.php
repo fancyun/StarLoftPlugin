@@ -1,7 +1,7 @@
 <?php
-namespace addon\star_loft_api\controller;
+namespace certification\star_loft_api\controller;
 
-use addon\star_loft_api\StarLoftApi;
+use certification\star_loft_api\StarLoftApi;
 
 /**
  * StarLoft API 中转插件 - 外部访问控制器（智简魔方业务系统 v10）

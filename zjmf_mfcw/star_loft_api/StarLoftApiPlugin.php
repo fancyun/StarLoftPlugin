@@ -1,10 +1,10 @@
 <?php
-namespace addon\star_loft_api;
+namespace certification\star_loft_api;
 
 use app\admin\lib\Plugin;
-use addon\star_loft_api\logic\Admin;
-use addon\star_loft_api\logic\KeyStore;
-use addon\star_loft_api\logic\Relay;
+use certification\star_loft_api\logic\Admin;
+use certification\star_loft_api\logic\KeyStore;
+use certification\star_loft_api\logic\Relay;
 
 /**
  * StarLoft API 中转插件（智简魔方财务版）
@@ -86,6 +86,33 @@ HTML;
     public function apiAdmin()
     {
         Admin::render($this->getPluginConfig());
+    }
+
+    /**
+     * 实名认证入口占位：本插件挂在实名认证分类下只为被魔方识别，不提供实名核验能力
+     */
+    public function personal($certifi)
+    {
+        return $this->notCertificationProvider();
+    }
+
+    public function company($certifi)
+    {
+        return $this->notCertificationProvider();
+    }
+
+    /**
+     * 前台自定义字段：本插件不收集实名信息
+     */
+    public function collectionInfo($type = null)
+    {
+        return [];
+    }
+
+    protected function notCertificationProvider()
+    {
+        return '<h3 class="pt-2 font-weight-bold h2 py-4" style="color:#f56c6c;">'
+            . '本插件用于 API 中转，请勿在实名认证设置中选择本插件</h3>';
     }
 
     /**

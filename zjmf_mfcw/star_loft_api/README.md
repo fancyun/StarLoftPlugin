@@ -2,13 +2,13 @@
 
 把 **StarLoft（星楼网络）** 的短信 / 人脸核验 API 转售给站点自有客户的渠道插件。站点管理员为每个客户生成一对**独立中转密钥**，客户持密钥调用本站点的中转端点；插件用站点配置的平台密钥转发到 StarLoft，并原样回传响应、按客户记录调用日志。
 
-- 插件类型：`addon`（若你的魔方把该分类命名为其它名称，只需把目录名、命名空间、`plugin.json.plugin_type` 与下文 URL 前缀一并改成实际分类即可）
+- 插件类型：`certification`（魔方只扫描它已知的分类目录；本插件挂在「实名认证接口」分类下，**请勿在实名认证设置里把它选作实名接口**。若你的魔方有独立的「功能插件」分类，把目录名、命名空间、`plugin.json.plugin_type` 与下文 URL 前缀四处一并改过去即可）
 - 插件标识（目录名）：`star_loft_api`
 - 依赖：PHP >= 7.0、curl / json 扩展、智简魔方财务版 3.7.6+
 
 ## 1. 安装
 
-1. 将 `star_loft_api` 目录上传到 `/public/plugins/addon/star_loft_api/`（**目录名必须与命名空间/类名一致**）。
+1. 将 `star_loft_api` 目录上传到 `/public/plugins/certification/star_loft_api/`（**目录名必须与命名空间/类名一致**）。
 2. 后台进入插件管理，找到「StarLoft API 中转」并点击「安装」。
    - 安装会尝试创建两张表（客户密钥表、调用日志表），表名带站点数据库前缀。**建表失败不影响安装**：中转仍可用，只是密钥管理页会提示，请把页面上给出的 SQL 交给 DBA 手工执行。
 3. 点击「配置」，填写平台 API 地址 / API Key / API Secret 与**管理令牌**。
@@ -44,7 +44,7 @@
 ## 3. 管理页
 
 ```
-https://你的站点/addon/star_loft_api/apiAdmin?token=你配置的管理令牌
+https://你的站点/certification/star_loft_api/apiAdmin?token=你配置的管理令牌
 ```
 
 页面提供：
@@ -65,7 +65,7 @@ https://你的站点/addon/star_loft_api/apiAdmin?token=你配置的管理令牌
 
 | 项 | 值 |
 |----|----|
-| 请求地址 | `https://你的站点/addon/star_loft_api/apiRelay?endpoint=<端点>` |
+| 请求地址 | `https://你的站点/certification/star_loft_api/apiRelay?endpoint=<端点>` |
 | `X-Api-Key` | 客户的中转密钥（`sk_...`） |
 | `X-Sign` | `HMAC-SHA256(中转Secret, 原始请求体)` 的小写十六进制；GET/DELETE 无请求体时签空串 |
 | `X-Sign-Version` | 固定 `hmac_sha256` |
@@ -100,7 +100,7 @@ https://你的站点/addon/star_loft_api/apiAdmin?token=你配置的管理令牌
 B='{"phone_number_set":["13800000000"],"template_id":123,"template_params":["123456"]}'
 TS=$(date +%s)
 SIG=$(printf '%s' "$B" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')
-curl -sS -X POST "https://你的站点/addon/star_loft_api/apiRelay?endpoint=sms/send" \
+curl -sS -X POST "https://你的站点/certification/star_loft_api/apiRelay?endpoint=sms/send" \
   -H "Content-Type: application/json" \
   -H "X-Api-Key: $KEY" -H "X-Sign: $SIG" -H "X-Sign-Version: hmac_sha256" -H "X-Timestamp: $TS" \
   -d "$B"
@@ -109,7 +109,7 @@ curl -sS -X POST "https://你的站点/addon/star_loft_api/apiRelay?endpoint=sms
 ```php
 $body = json_encode(['biz_no' => '2026...'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 $sign = hash_hmac('sha256', $body, $secret);
-$ch = curl_init('https://你的站点/addon/star_loft_api/apiRelay?endpoint=fv/result');
+$ch = curl_init('https://你的站点/certification/star_loft_api/apiRelay?endpoint=fv/result');
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_POST           => true,
@@ -131,7 +131,7 @@ $resp = curl_exec($ch);
 
 ```nginx
 location ^~ /v1/ {
-    rewrite ^/v1/(.*)$ /addon/star_loft_api/apiRelay?endpoint=$1 last;
+    rewrite ^/v1/(.*)$ /certification/star_loft_api/apiRelay?endpoint=$1 last;
 }
 ```
 
