@@ -1,5 +1,5 @@
 <?php
-namespace sms\star_loft_sms\logic;
+namespace sms\starloft_sms\logic;
 
 require_once __DIR__ . '/sdk/Client.php';
 require_once __DIR__ . '/sdk/SmsClient.php';

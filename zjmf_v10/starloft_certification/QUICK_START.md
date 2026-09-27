@@ -2,7 +2,7 @@
 
 ## 📦 安装
 
-1. 将 `star_loft_certification` 上传到 `/public/plugins/certification/star_loft_certification/`
+1. 将 `starloft_certification` 上传到 `/public/plugins/certification/starloft_certification/`
 2. 后台：`实名认证 → 接口管理` → 找到插件 → 点击「安装」
 3. 点击「配置」：
 
@@ -28,7 +28,7 @@ API Secret: your_api_secret_here
 
 - API 连接/鉴权失败：核对 API 地址（含 `/api`）、API Key/Secret、服务器时间（±5 分钟）
 - 摄像头无法使用：确认用户使用 Chrome/Edge 最新版，并授权摄像头（webRTC）
-- 一直「认证中」：确认 `/certification/star_loft_certification/index/notifyHandle` 可从外网访问
+- 一直「认证中」：确认 `/certification/starloft_certification/index/notifyHandle` 可从外网访问
 
 ## 📚 文档
 

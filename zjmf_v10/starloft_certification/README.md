@@ -11,7 +11,7 @@
 
 - ✅ 个人实名：姓名 + 身份证号 + 人脸核验（`fv_auth`）
 - ✅ 企业实名：企业名称 + 统一社会信用代码 + 法人姓名 + 法人身份证号 + 法人人脸核验（`fv_auth`）
-- ✅ 按 v10 实名认证接口规范开发（`StarLoftCertificationPerson` / `StarLoftCertificationCompany` / `StarLoftCertificationCollectionInfo`）
+- ✅ 按 v10 实名认证接口规范开发（`StarloftCertificationPerson` / `StarloftCertificationCompany` / `StarloftCertificationCollectionInfo`）
 - ✅ 收到结果后主动调用 `/api/fv/result` 做结果校对，落地前对齐上游
 - ✅ 支持跳过平台异步通知（只靠主动查询/校对同步结果）
 - ✅ 异步回调（notify_url）+ 前台状态轮询 + HMAC-SHA256 签名认证
@@ -20,8 +20,8 @@
 ## 目录结构
 
 ```
-star_loft_certification/
-├── StarLoftCertification.php                    # 插件入口文件（命名空间 certification\star_loft_certification）
+starloft_certification/
+├── StarloftCertification.php                    # 插件入口文件（命名空间 certification\starloft_certification）
 ├── config.php                         # 插件配置项
 ├── controller/
 │   └── IndexController.php            # 外部回调控制器
@@ -34,7 +34,7 @@ star_loft_certification/
 
 ## 安装步骤
 
-1. 将 `star_loft_certification` 文件夹上传到 `/public/plugins/certification/star_loft_certification/`。
+1. 将 `starloft_certification` 文件夹上传到 `/public/plugins/certification/starloft_certification/`。
 2. 登录 v10 管理后台，进入 `实名认证 → 接口管理`，找到「StarLoft FV人脸核验认证」并点击「安装」。
 3. 安装后点击「配置」，填写 API 地址 / API Key / API Secret。
 
@@ -55,8 +55,8 @@ star_loft_certification/
 
 | 地址 | 用途 |
 |------|------|
-| `/certification/star_loft_certification/index/notifyHandle` | 异步通知（校验签名 → 结果校对 → 落地） |
-| `/certification/star_loft_certification/index/result` | 认证完成回跳页 |
+| `/certification/starloft_certification/index/notifyHandle` | 异步通知（校验签名 → 结果校对 → 落地） |
+| `/certification/starloft_certification/index/result` | 认证完成回跳页 |
 
 ## 平台对接说明
 

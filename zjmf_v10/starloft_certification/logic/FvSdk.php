@@ -1,5 +1,5 @@
 <?php
-namespace certification\star_loft_certification\logic;
+namespace certification\starloft_certification\logic;
 
 require_once __DIR__ . '/sdk/Client.php';
 require_once __DIR__ . '/sdk/FvClient.php';

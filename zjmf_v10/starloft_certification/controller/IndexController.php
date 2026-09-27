@@ -1,16 +1,16 @@
 <?php
-namespace certification\star_loft_certification\controller;
+namespace certification\starloft_certification\controller;
 
-use certification\star_loft_certification\StarLoftCertification;
+use certification\starloft_certification\StarloftCertification;
 
 /**
  * StarLoft 人脸核验(FV)插件 - 外部回调控制器（智简魔方业务系统 v10 · 人脸识别型 _fv）
  *
  * 按 v10 实名认证接口规范，插件根目录下创建 controller 目录用于外部访问（异步/同步回调）。
  * 访问地址：
- *   - 异步通知:   {域名}/certification/star_loft_certification/index/notifyHandle
- *   - 认证完成回跳: {域名}/certification/star_loft_certification/index/result
- *   - 状态查询(AJAX): {域名}/certification/star_loft_certification/index/status
+ *   - 异步通知:   {域名}/certification/starloft_certification/index/notifyHandle
+ *   - 认证完成回跳: {域名}/certification/starloft_certification/index/result
+ *   - 状态查询(AJAX): {域名}/certification/starloft_certification/index/status
  *
  * 收到平台异步推送后，先做结果校对（调用 /api/fv/result 对齐上游），再落地本地。
  *
@@ -35,7 +35,7 @@ class IndexController
         }
 
         $sign = (string)($data['sign'] ?? '');
-        $plugin = new StarLoftCertification();
+        $plugin = new StarloftCertification();
         if (!$plugin->verifyNotifySign($data, $sign)) {
             echo json_encode(['code' => 401, 'message' => 'signature verification failed']);
             return;
@@ -77,7 +77,7 @@ class IndexController
         $statusHtml = '<p>正在查询核验结果...</p>';
         if ($certifyId !== '') {
             try {
-                $plugin = new StarLoftCertification();
+                $plugin = new StarloftCertification();
                 $res = $plugin->getStatus(['certify_id' => $certifyId]);
                 $s = (int)($res['status'] ?? 0);
                 $msg = htmlspecialchars((string)($res['msg'] ?? ''), ENT_QUOTES, 'UTF-8');
@@ -134,7 +134,7 @@ HTML;
         }
 
         try {
-            $plugin = new StarLoftCertification();
+            $plugin = new StarloftCertification();
             $res = $plugin->getStatus(['certify_id' => $certifyId]);
             echo json_encode($res);
         } catch (\Throwable $e) {

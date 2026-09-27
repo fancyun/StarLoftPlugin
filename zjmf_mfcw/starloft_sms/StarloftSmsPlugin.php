@@ -1,8 +1,8 @@
 <?php
-namespace sms\star_loft_sms;
+namespace sms\starloft_sms;
 
 use app\admin\lib\Plugin;
-use sms\star_loft_sms\logic\SmsSdk;
+use sms\starloft_sms\logic\SmsSdk;
 
 /**
  * StarLoft 短信服务(SMS)插件（智简魔方财务版 · 平台模板型）
@@ -20,19 +20,19 @@ use sms\star_loft_sms\logic\SmsSdk;
  * @author StarLoft
  * @version 3.0.0
  */
-class StarLoftSmsPlugin extends Plugin
+class StarloftSmsPlugin extends Plugin
 {
     /**
      * 插件基本信息（name 为类名不带 Plugin，作为魔方插件唯一标识）
      */
     public $info = [
-        'name'        => 'StarLoftSms',
+        'name'        => 'StarloftSms',
         'title'       => 'StarLoft 短信服务',
         'description' => 'StarLoft 短信服务（平台模板型 · 国内短信）— 智简魔方财务版',
         'status'      => 1,
         'author'      => 'StarLoft',
         'version'     => '3.0.0',
-        'help_url'    => 'https://docs.starloft.cn/sms/plugin/star_loft_sms_for_zjmf_mfcw',
+        'help_url'    => 'https://docs.starloft.cn/sms/plugin/starloft_sms',
     ];
 
     /**

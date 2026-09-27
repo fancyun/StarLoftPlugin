@@ -1,18 +1,19 @@
 {
     "name": "StarLoft 短信服务",
     "version": "3.0.0",
-    "description": "对接「星楼网络」短信服务(SMS)的短信插件（智简魔方业务系统 v10 · 平台模板型）。支持国内短信：模板管理（getCnTemplate/createCnTemplate/putCnTemplate/deleteCnTemplate）与发送（sendCnSms），安装时自动导入全部系统模板。",
+    "description": "对接「星楼网络」短信服务(SMS)的短信插件（智简魔方财务版 · 平台模板型）。支持国内短信：模板管理（getCnTemplate/createCnTemplate/putCnTemplate/deleteCnTemplate）与发送（sendCnSms），安装时自动导入全部系统模板。",
     "author": "StarLoft",
     "website": "https://docs.starloft.cn/sms/plugin",
     "plugin_type": "sms",
-    "dir": "star_loft_sms",
-    "namespace": "sms\\star_loft_sms",
-    "class": "StarLoftSms",
+    "dir": "starloft_sms",
+    "namespace": "sms\\starloft_sms",
+    "class": "StarloftSmsPlugin",
     "support": {
         "cn": true,
         "global": false
     },
     "requires": {
+        "zjmf_version": ">=3.7.6",
         "php_version": ">=7.0",
         "extensions": [
             "curl",

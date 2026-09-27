@@ -19,8 +19,8 @@
 ## 目录结构
 
 ```
-star_loft_certification/
-├── StarLoftCertificationPlugin.php   # 插件主类（入口）
+starloft_certification/
+├── StarloftCertificationPlugin.php   # 插件主类（入口）
 │   ├── install() / uninstall()
 │   ├── personal()            # 个人有源人脸核验
 │   ├── company()             # 企业法人扫脸
@@ -36,7 +36,7 @@ star_loft_certification/
 
 ## 安装步骤
 
-1. 将 `star_loft_certification` 文件夹上传到 `/public/plugins/certification/star_loft_certification/`。
+1. 将 `starloft_certification` 文件夹上传到 `/public/plugins/certification/starloft_certification/`。
 2. 后台进入 `系统设置 → 实名认证设置 → 接口设置`，找到「StarLoft 人脸核验」并点击「安装」。
 3. 安装后点击「配置」，填写 API 地址 / API Key / API Secret。
 

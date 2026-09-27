@@ -18,8 +18,8 @@
 ## 目录结构
 
 ```
-star_loft_sms/
-├── StarLoftSmsPlugin.php   # 插件入口类（命名空间 sms\star_loft_sms）
+starloft_sms/
+├── StarloftSmsPlugin.php   # 插件入口类（命名空间 sms\starloft_sms）
 │   ├── install() / uninstall() / description()
 │   ├── getCnTemplate / createCnTemplate / putCnTemplate / deleteCnTemplate
 │   └── sendCnSms() / sendSms()
@@ -35,7 +35,7 @@ star_loft_sms/
 
 ## 安装步骤
 
-1. 将 `star_loft_sms` 文件夹上传到 `/public/plugins/sms/star_loft_sms/`（**目录名必须与插件命名空间/类名一致**）。
+1. 将 `starloft_sms` 文件夹上传到 `/public/plugins/sms/starloft_sms/`（**目录名必须与插件命名空间/类名一致**）。
 2. 后台进入 `系统设置 → 短信设置 → 短信接口`，找到「StarLoft 短信服务」点击「安装」（安装时自动导入全部短信模板）。
 3. 安装后点击「配置」，填写 API 地址 / API Key / API Secret / 默认短信签名内容 / 默认短信类型。
 4. 在「短信模板」页面将模板提交审核（提交后自动上报星楼网络平台，平台/上游审核通过后模板状态为「通过」）。

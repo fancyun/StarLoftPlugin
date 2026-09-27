@@ -5,9 +5,9 @@
     "author": "StarLoft",
     "website": "https://docs.starloft.cn/fv/plugin",
     "plugin_type": "certification",
-    "dir": "star_loft_certification",
-    "namespace": "certification\\star_loft_certification",
-    "class": "StarLoftCertificationPlugin",
+    "dir": "starloft_certification",
+    "namespace": "certification\\starloft_certification",
+    "class": "StarloftCertificationPlugin",
     "support_personal": true,
     "support_company": false,
     "requires": {

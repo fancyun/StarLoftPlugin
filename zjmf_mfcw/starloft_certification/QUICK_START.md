@@ -2,7 +2,7 @@
 
 ## 📦 安装
 
-1. 将 `star_loft_certification` 上传到 `/public/plugins/certification/star_loft_certification/`
+1. 将 `starloft_certification` 上传到 `/public/plugins/certification/starloft_certification/`
 2. 后台：`系统设置 → 实名认证设置 → 接口设置` → 找到插件 → 点击「安装」
 3. 点击「配置」：
 
