@@ -254,6 +254,26 @@ class KeyStore
         return \think\Db::name(self::KEY_TABLE)->where('id', (int)$id)->delete();
     }
 
+    /**
+     * 修改客户密钥（只更新传入的字段），返回是否执行
+     */
+    public static function updateKey($id, array $fields)
+    {
+        $allow = ['client_name', 'access_key', 'access_secret', 'permissions', 'remark'];
+        $data  = [];
+        foreach ($allow as $name) {
+            if (array_key_exists($name, $fields)) {
+                $data[$name] = (string)$fields[$name];
+            }
+        }
+        if (empty($data)) {
+            return false;
+        }
+        $data['update_time'] = date('Y-m-d H:i:s');
+        \think\Db::name(self::KEY_TABLE)->where('id', (int)$id)->update($data);
+        return true;
+    }
+
     /** 生成唯一中转密钥（sk_ + 32 位十六进制） */
     protected static function generateAccessKey()
     {
@@ -364,6 +384,26 @@ class KeyStore
     }
 
     // ==================== 调用日志 ====================
+
+    /** 面板统计：密钥数、预付余额合计、当日调用次数 */
+    public static function stats()
+    {
+        $out = ['keys' => 0, 'balance' => 0.0, 'calls_today' => 0];
+        try {
+            $rows = self::listKeys();
+            $out['keys'] = count($rows);
+            foreach ($rows as $one) {
+                $out['balance'] += (float)($one['balance'] ?? 0);
+            }
+            $out['balance'] = round($out['balance'], 2);
+        } catch (\Throwable $_) {}
+        try {
+            $out['calls_today'] = (int)\think\Db::name(self::LOG_TABLE)
+                ->where('create_time', '>=', date('Y-m-d 00:00:00'))
+                ->count();
+        } catch (\Throwable $_) {}
+        return $out;
+    }
 
     /** 写一条调用日志（失败不影响中转） */
     public static function logCall(array $row)
