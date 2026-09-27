@@ -2,10 +2,11 @@
 namespace addon\star_loft_api\logic;
 
 /**
- * API 中转
+ * API 中转（含计费）
  *
  * 客户持站点下发的「中转密钥」按平台同一套规则签名调用本站点中转端点；
- * 插件校验通过后，用站点配置的平台密钥重新签名转发到 StarLoft，并原样回传状态码与响应体。
+ * 插件校验通过后：按端点单价从客户预付余额里**预扣**，再用站点配置的平台密钥重新签名转发到 StarLoft，
+ * 原样回传状态码与响应体；平台返回非成功（code != 0）时把预扣金额**原路退还**。
  */
 class Relay
 {
@@ -16,14 +17,14 @@ class Relay
     const TIMEOUT = 60;
 
     /**
-     * 可中转的端点白名单：endpoint 参数 => 平台路径 + 各 HTTP 方法所需权限码
+     * 可中转的端点白名单：endpoint 参数 => 平台路径 + 各 HTTP 方法所需权限码 + 计价配置键
      *
      * 路径与权限码与平台 /v1/* 契约一一对应；客户只能按本表取值，不能传任意路径。
      */
     public static function endpoints()
     {
         return [
-            'sms/send'          => ['path' => '/v1/sms/send',      'methods' => ['POST' => 'sms_send']],
+            'sms/send'          => ['path' => '/v1/sms/send',      'methods' => ['POST' => 'sms_send'], 'price' => 'price_sms_send'],
             'sms/signs'         => ['path' => '/v1/sms/signs',     'methods' => ['POST' => 'sms_sign']],
             'sms/templates'     => ['path' => '/v1/sms/templates', 'methods' => ['POST' => 'sms_template_create']],
             'sms/templates/:id' => [
@@ -33,8 +34,8 @@ class Relay
             ],
             'sms/report'        => ['path' => '/v1/sms/report',    'methods' => ['POST' => 'sms_report']],
             'sms/replies'       => ['path' => '/v1/sms/replies',   'methods' => ['POST' => 'sms_replies']],
-            'fv/auth'           => ['path' => '/v1/fv/auth',       'methods' => ['POST' => 'fv_auth']],
-            'fv/self'           => ['path' => '/v1/fv/self',       'methods' => ['POST' => 'fv_self']],
+            'fv/auth'           => ['path' => '/v1/fv/auth',       'methods' => ['POST' => 'fv_auth'],   'price' => 'price_fv_auth'],
+            'fv/self'           => ['path' => '/v1/fv/self',       'methods' => ['POST' => 'fv_self'],   'price' => 'price_fv_self'],
             'fv/result'         => ['path' => '/v1/fv/result',     'methods' => ['POST' => 'fv_result']],
             'fv/best-img'       => ['path' => '/v1/fv/best-img',   'methods' => ['POST' => 'fv_best_img']],
             'fv/media'          => ['path' => '/v1/fv/media',      'methods' => ['POST' => 'fv_media']],
@@ -42,9 +43,9 @@ class Relay
     }
 
     /**
-     * 处理一次中转请求：校验 → 转发 → 回传 → 记日志（本方法会结束请求）
+     * 处理一次中转请求：校验 → 预扣 → 转发 → 结算 → 回传 → 记日志（本方法会结束请求）
      *
-     * 带 X-Api-Key 的每次尝试都会落一条日志（含鉴权失败），便于站点排查与对账；
+     * 带 X-Api-Key 的每次尝试都会落一条日志（含鉴权失败/余额不足），便于站点排查与对账；
      * 未带密钥的扫描流量不落日志，避免污染。
      */
     public static function handle(array $cfg)
@@ -142,6 +143,22 @@ class Relay
             $path = sprintf($path, $id);
         }
 
+        // 预扣：余额不足直接拒绝；扣费本身出错按系统错误报
+        list($units, , $cost) = self::estimate($endpoint, $body, $cfg);
+        $charged = 0.0;
+        if ($cost > 0) {
+            $chargeError = null;
+            list($ok, $balance) = KeyStore::charge($client['id'], $cost, $chargeError);
+            if ($chargeError !== null) {
+                self::reject($ctx, $client, 500, '扣费失败（密钥表缺 balance 列？请重装插件或执行管理页给出的 SQL）：' . $chargeError);
+            }
+            if (!$ok) {
+                self::reject($ctx, $client, 402,
+                    '余额不足，请联系站点管理员充值（当前余额 ' . self::money($balance) . ' 元，本次需 ' . self::money($cost) . ' 元）');
+            }
+            $charged = $cost;
+        }
+
         list($status, $raw, $err) = self::forward($apiUrl, $platformKey, $platformSecret, $method, $path, $body);
         if ($err !== '') {
             $status = 504;
@@ -151,11 +168,45 @@ class Relay
             $status = 502;
         }
 
+        // 结算：平台未成功（code != 0，含转发失败）则把预扣金额原路退还
         $decoded = json_decode((string)$raw, true);
-        self::writeLog($ctx, $client, $status, is_array($decoded) ? (int)($decoded['code'] ?? -1) : -1,
-            is_array($decoded) ? (string)($decoded['message'] ?? '') : (string)$raw);
+        $code    = is_array($decoded) ? (int)($decoded['code'] ?? -1) : -1;
+        if ($charged > 0 && $code !== 0) {
+            KeyStore::refund($client['id'], $charged);
+            $charged = 0.0;
+        }
+        $balanceAfter = KeyStore::balanceOf($client['id']);
 
+        self::writeLog($ctx, $client, $status, $code,
+            is_array($decoded) ? (string)($decoded['message'] ?? '') : (string)$raw, $charged, $balanceAfter);
+
+        if (!headers_sent()) {
+            header('X-Relay-Price: ' . self::money($charged));
+            header('X-Relay-Balance: ' . self::money($balanceAfter));
+            header('X-Relay-Units: ' . (int)$units);
+        }
         self::output($status, (string)$raw);
+    }
+
+    /**
+     * 计费预估：返回 [计费单位数, 单价, 应扣金额]
+     *
+     * 短信发送按请求里的号码个数计费（长短信拆分条数不在此估算，站点单价需覆盖最坏情况）；
+     * 其余端点按次计费（末配置单价默认为 0，即免费）。
+     */
+    public static function estimate($endpoint, $body, array $cfg)
+    {
+        $map   = self::endpoints();
+        $rule  = isset($map[$endpoint]) ? $map[$endpoint] : [];
+        $key   = (string)($rule['price'] ?? 'price_other');
+        $unit  = round((float)($cfg[$key] ?? 0), 2);
+        $units = 1;
+        if ($endpoint === 'sms/send') {
+            $data  = json_decode((string)$body, true);
+            $list  = (is_array($data) && is_array($data['phone_number_set'] ?? null)) ? $data['phone_number_set'] : [];
+            $units = count($list) > 0 ? count($list) : 1;
+        }
+        return [$units, $unit, round($unit * $units, 2)];
     }
 
     /**
@@ -196,6 +247,12 @@ class Relay
             }
         }
         return false;
+    }
+
+    /** 金额格式化（两位小数，不带千分位） */
+    public static function money($amount)
+    {
+        return number_format(round((float)$amount, 2), 2, '.', '');
     }
 
     /**
@@ -244,7 +301,7 @@ class Relay
     /**
      * 写调用日志：未带 X-Api-Key 的请求不记（扫描流量），日志开关关闭时不记
      */
-    protected static function writeLog(array $ctx, $client, $httpStatus, $code, $message)
+    protected static function writeLog(array $ctx, $client, $httpStatus, $code, $message, $price = 0.0, $balanceAfter = 0.0)
     {
         if ((int)($ctx['cfg']['log_enabled'] ?? 1) !== 1) {
             return;
@@ -253,16 +310,18 @@ class Relay
             return;
         }
         KeyStore::logCall([
-            'access_key'  => is_array($client) ? (string)$client['access_key'] : (string)$ctx['api_key'],
-            'client_name' => is_array($client) ? (string)$client['client_name'] : '',
-            'endpoint'    => (string)$ctx['endpoint'],
-            'method'      => (string)$ctx['method'],
-            'http_status' => (int)$httpStatus,
-            'code'        => (int)$code,
-            'message'     => mb_substr((string)$message, 0, 200),
-            'cost_ms'     => (int)round((microtime(true) - (float)$ctx['started']) * 1000),
-            'ip'          => self::clientIp(),
-            'create_time' => date('Y-m-d H:i:s'),
+            'access_key'    => is_array($client) ? (string)$client['access_key'] : (string)$ctx['api_key'],
+            'client_name'   => is_array($client) ? (string)$client['client_name'] : '',
+            'endpoint'      => (string)$ctx['endpoint'],
+            'method'        => (string)$ctx['method'],
+            'http_status'   => (int)$httpStatus,
+            'code'          => (int)$code,
+            'message'       => mb_substr((string)$message, 0, 200),
+            'price'         => round((float)$price, 2),
+            'balance_after' => round((float)$balanceAfter, 2),
+            'cost_ms'       => (int)round((microtime(true) - (float)$ctx['started']) * 1000),
+            'ip'            => self::clientIp(),
+            'create_time'   => date('Y-m-d H:i:s'),
         ]);
     }
 

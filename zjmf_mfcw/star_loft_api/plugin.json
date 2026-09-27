@@ -70,6 +70,30 @@
             "required": false,
             "default": "0"
         },
+        "price_sms_send": {
+            "title": "短信发送单价（元/号码）",
+            "type": "text",
+            "required": false,
+            "default": "0"
+        },
+        "price_fv_auth": {
+            "title": "有源人脸单价（元/次）",
+            "type": "text",
+            "required": false,
+            "default": "0"
+        },
+        "price_fv_self": {
+            "title": "无源人脸单价（元/次）",
+            "type": "text",
+            "required": false,
+            "default": "0"
+        },
+        "price_other": {
+            "title": "其余端点单价（元/次）",
+            "type": "text",
+            "required": false,
+            "default": "0"
+        },
         "log_enabled": {
             "title": "记录调用日志",
             "type": "radio",

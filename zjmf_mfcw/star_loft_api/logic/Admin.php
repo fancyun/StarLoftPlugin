@@ -64,6 +64,12 @@ class Admin
         if ($notice !== '') {
             $html .= '<div class="notice">' . self::e($notice) . '</div>';
         }
+        $html .= '<div class="card"><b>当前计费单价</b>（0 表示免费；短信按号码个数计费，长短信拆分条数需自行覆盖）<br>'
+            . '短信发送 ' . Relay::money($cfg['price_sms_send'] ?? 0) . ' 元/号码，'
+            . '有源人脸 ' . Relay::money($cfg['price_fv_auth'] ?? 0) . ' 元/次，'
+            . '无源人脸 ' . Relay::money($cfg['price_fv_self'] ?? 0) . ' 元/次，'
+            . '其余端点 ' . Relay::money($cfg['price_other'] ?? 0) . ' 元/次。'
+            . '调用成功才扣费，平台返回失败会自动退还。</div>';
         $html .= '<form class="inline" method="post">'
             . '<input type="hidden" name="action" value="test">'
             . '<button type="submit">测试平台连通/鉴权</button></form>';
@@ -104,6 +110,18 @@ class Admin
                     return '已启用密钥 #' . $id;
                 case 'reset':
                     return '已重置密钥 #' . $id . ' 的 Secret（新 Secret 仅本次显示：' . KeyStore::resetSecret($id) . '）';
+                case 'recharge':
+                case 'deduct':
+                    $amount = round((float)($_POST['amount'] ?? 0), 2);
+                    if ($amount <= 0) {
+                        return '请输入大于 0 的金额';
+                    }
+                    list($ok, $balance) = KeyStore::recharge($id, $action === 'recharge' ? $amount : -$amount);
+                    if (!$ok) {
+                        return '操作失败：余额不足（当前 ' . Relay::money($balance) . ' 元）';
+                    }
+                    return '已' . ($action === 'recharge' ? '充值' : '扣减') . ' ' . Relay::money($amount)
+                        . ' 元，客户 #' . $id . ' 当前余额 ' . Relay::money($balance) . ' 元';
                 case 'delete':
                     KeyStore::deleteKey($id);
                     return '已删除密钥 #' . $id;
@@ -129,10 +147,10 @@ class Admin
             . '<button type="submit">生成密钥</button></div></form>';
 
         $h .= '<table><thead><tr>'
-            . '<th>ID</th><th>客户</th><th>中转密钥</th><th>权限</th><th>状态</th><th>备注</th><th>创建时间</th><th>操作</th>'
+            . '<th>ID</th><th>客户</th><th>中转密钥</th><th>余额(元)</th><th>权限</th><th>状态</th><th>备注</th><th>创建时间</th><th>操作</th>'
             . '</tr></thead><tbody>';
         if (empty($keys)) {
-            $h .= '<tr><td colspan="8" class="empty">暂无客户密钥</td></tr>';
+            $h .= '<tr><td colspan="9" class="empty">暂无客户密钥</td></tr>';
         }
         foreach ((array)$keys as $row) {
             $id = (int)($row['id'] ?? 0);
@@ -140,11 +158,13 @@ class Admin
                 . '<td>' . $id . '</td>'
                 . '<td>' . self::e((string)($row['client_name'] ?? '')) . '</td>'
                 . '<td><code>' . self::e(self::maskKey((string)($row['access_key'] ?? ''))) . '</code></td>'
+                . '<td>' . Relay::money($row['balance'] ?? 0) . '</td>'
                 . '<td>' . self::e((string)($row['permissions'] ?? '')) . '</td>'
                 . '<td>' . ((int)($row['status'] ?? 0) === 1 ? '启用' : '<span class="off">停用</span>') . '</td>'
                 . '<td>' . self::e((string)($row['remark'] ?? '')) . '</td>'
                 . '<td>' . self::e((string)($row['create_time'] ?? '')) . '</td>'
-                . '<td>' . self::actionForms($selfUrl, $nonce, $id, (int)($row['status'] ?? 0) === 1) . '</td>'
+                . '<td>' . self::actionForms($selfUrl, $nonce, $id, (int)($row['status'] ?? 0) === 1)
+                . self::balanceForm($selfUrl, $nonce, $id) . '</td>'
                 . '</tr>';
         }
         $h .= '</tbody></table>';
@@ -164,10 +184,24 @@ class Admin
                 . $base . '<input type="hidden" name="action" value="' . self::e($action) . '">'
                 . '<button type="submit">' . self::e($label) . '</button></form>';
         };
-        $out = $btn($enabled ? 'disable' : 'enable', $enabled ? '停用' : '启用');
+        $out  = $btn($enabled ? 'disable' : 'enable', $enabled ? '停用' : '启用');
         $out .= $btn('reset', '重置密钥', '重置后旧 Secret 立即失效，确认？');
         $out .= $btn('delete', '删除', '删除后客户将无法调用，确认？');
         return $out;
+    }
+
+    /** 单客户的余额操作（充值/扣减），金额为空或非正数时不提交 */
+    protected static function balanceForm($selfUrl, $nonce, $id)
+    {
+        return '<form class="inline" method="post" action="' . self::e($selfUrl) . '"'
+            . ' onsubmit="if(!(parseFloat(this.amount.value)>0)){alert(\'请输入大于 0 的金额\');return false;}">'
+            . '<input type="hidden" name="token" value="' . self::e((string)($_GET['token'] ?? '')) . '">'
+            . '<input type="hidden" name="nonce" value="' . self::e($nonce) . '">'
+            . '<input type="hidden" name="id" value="' . (int)$id . '">'
+            . '<input name="amount" type="number" step="0.01" min="0.01" placeholder="金额" style="width:78px;padding:4px;">'
+            . '<button type="submit" name="action" value="recharge">充值</button>'
+            . '<button type="submit" name="action" value="deduct">扣减</button>'
+            . '</form>';
     }
 
     /** 最近调用日志区块 */
@@ -175,10 +209,10 @@ class Admin
     {
         $h = '<h2>最近调用日志（' . self::LOG_LIMIT . ' 条）</h2>';
         $h .= '<table><thead><tr>'
-            . '<th>时间</th><th>客户</th><th>端点</th><th>方法</th><th>HTTP</th><th>业务码</th><th>耗时(ms)</th><th>IP</th><th>消息</th>'
+            . '<th>时间</th><th>客户</th><th>端点</th><th>方法</th><th>HTTP</th><th>业务码</th><th>扣费(元)</th><th>余额(元)</th><th>耗时(ms)</th><th>IP</th><th>消息</th>'
             . '</tr></thead><tbody>';
         if (empty($logs)) {
-            $h .= '<tr><td colspan="9" class="empty">暂无日志</td></tr>';
+            $h .= '<tr><td colspan="11" class="empty">暂无日志</td></tr>';
         }
         foreach ((array)$logs as $row) {
             $h .= '<tr>'
@@ -188,6 +222,8 @@ class Admin
                 . '<td>' . self::e((string)($row['method'] ?? '')) . '</td>'
                 . '<td>' . (int)($row['http_status'] ?? 0) . '</td>'
                 . '<td>' . (int)($row['code'] ?? 0) . '</td>'
+                . '<td>' . Relay::money($row['price'] ?? 0) . '</td>'
+                . '<td>' . Relay::money($row['balance_after'] ?? 0) . '</td>'
                 . '<td>' . (int)($row['cost_ms'] ?? 0) . '</td>'
                 . '<td>' . self::e((string)($row['ip'] ?? '')) . '</td>'
                 . '<td>' . self::e((string)($row['message'] ?? '')) . '</td>'

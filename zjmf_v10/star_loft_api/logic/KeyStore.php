@@ -2,9 +2,10 @@
 namespace addon\star_loft_api\logic;
 
 /**
- * 客户中转密钥与调用日志的存取
+ * 客户中转密钥、预付余额与调用日志的存取
  *
- * 数据落在站点自己的数据库：安装插件时幂等建表；无 DDL 权限时由管理页给出可手工执行的建表 SQL。
+ * 数据落在站点自己的数据库：安装插件时幂等建表并补齐新增列；无 DDL 权限时由管理页给出可手工执行的 SQL。
+ * 客户的费用走插件自带的预付余额（不复用魔方核心余额表），站点在管理页为客户充值。
  */
 class KeyStore
 {
@@ -43,7 +44,7 @@ class KeyStore
     }
 
     /**
-     * 幂等建表（安装时与管理页访问时都会调用）
+     * 幂等建表并补齐新增列（安装时与管理页访问时都会调用）
      *
      * @param string|null $error 失败原因
      * @return bool
@@ -53,6 +54,39 @@ class KeyStore
         try {
             \think\Db::execute(self::keyTableSql());
             \think\Db::execute(self::logTableSql());
+        } catch (\Throwable $e) {
+            $error = $e->getMessage();
+            return false;
+        }
+        return self::ensureColumns($error);
+    }
+
+    /**
+     * 为已存在的旧表补齐新增列（建表用 CREATE TABLE IF NOT EXISTS，不会给老表加列）
+     */
+    public static function ensureColumns(&$error = null)
+    {
+        $columns = [
+            self::KEY_TABLE => [
+                'balance' => "ALTER TABLE `%s` ADD COLUMN `balance` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '客户预付余额（元）'",
+            ],
+            self::LOG_TABLE => [
+                'price'         => "ALTER TABLE `%s` ADD COLUMN `price` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '本次扣费（元）'",
+                'balance_after' => "ALTER TABLE `%s` ADD COLUMN `balance_after` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '扣费后余额（元）'",
+            ],
+        ];
+        try {
+            foreach ($columns as $table => $cols) {
+                $existing = self::columnsOf($table);
+                if (empty($existing)) {
+                    continue;
+                }
+                foreach ($cols as $col => $sql) {
+                    if (!isset($existing[strtolower($col)])) {
+                        \think\Db::execute(sprintf($sql, self::table($table)));
+                    }
+                }
+            }
             return true;
         } catch (\Throwable $e) {
             $error = $e->getMessage();
@@ -70,6 +104,7 @@ class KeyStore
   `access_key` VARCHAR(64) NOT NULL COMMENT '中转密钥',
   `access_secret` VARCHAR(128) NOT NULL COMMENT '中转密钥 Secret',
   `permissions` VARCHAR(255) NOT NULL DEFAULT 'all' COMMENT 'all 或逗号分隔权限码',
+  `balance` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '客户预付余额（元）',
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '1启用 0停用',
   `remark` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '备注',
   `create_time` DATETIME NULL,
@@ -92,6 +127,8 @@ class KeyStore
   `http_status` INT NOT NULL DEFAULT 0,
   `code` INT NOT NULL DEFAULT 0,
   `message` VARCHAR(255) NOT NULL DEFAULT '',
+  `price` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '本次扣费（元）',
+  `balance_after` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '扣费后余额（元）',
   `cost_ms` INT NOT NULL DEFAULT 0,
   `ip` VARCHAR(45) NOT NULL DEFAULT '',
   `create_time` DATETIME NULL,
@@ -99,6 +136,22 @@ class KeyStore
   KEY `idx_access_key` (`access_key`),
   KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='StarLoft API 中转-调用日志'";
+    }
+
+    /** 表已存在的列（名字转小写） */
+    protected static function columnsOf($table)
+    {
+        $cols = [];
+        try {
+            $raw = \think\Db::query('SHOW COLUMNS FROM `' . self::table($table) . '`');
+            foreach ((array)$raw as $row) {
+                $name = (string)($row['Field'] ?? ($row['field'] ?? ''));
+                if ($name !== '') {
+                    $cols[strtolower($name)] = true;
+                }
+            }
+        } catch (\Throwable $_) {}
+        return $cols;
     }
 
     // ==================== 密钥 ====================
@@ -115,6 +168,12 @@ class KeyStore
         return \think\Db::name(self::KEY_TABLE)->where('access_key', (string)$accessKey)->find();
     }
 
+    /** 按主键取值 */
+    public static function getById($id)
+    {
+        return \think\Db::name(self::KEY_TABLE)->where('id', (int)$id)->find();
+    }
+
     /**
      * 新建客户密钥，返回含明文 Secret 的记录（仅此一次可见）
      */
@@ -126,6 +185,7 @@ class KeyStore
             'access_key'    => self::generateAccessKey(),
             'access_secret' => bin2hex(random_bytes(24)),
             'permissions'   => trim((string)$permissions) !== '' ? trim((string)$permissions) : 'all',
+            'balance'       => 0,
             'status'        => 1,
             'remark'        => mb_substr((string)$remark, 0, 255),
             'create_time'   => $now,
@@ -175,6 +235,99 @@ class KeyStore
             }
         }
         return 'sk_' . bin2hex(random_bytes(16));
+    }
+
+    // ==================== 预付余额 ====================
+
+    /** 读取余额（元） */
+    public static function balanceOf($id)
+    {
+        try {
+            $row = self::getById($id);
+            return round((float)($row['balance'] ?? 0), 2);
+        } catch (\Throwable $_) {
+            return 0.0;
+        }
+    }
+
+    /**
+     * 原子预扣：余额充足才扣，返回 [是否成功, 扣后余额]
+     *
+     * 条件更新（balance >= amount）保证并发下不会扣成负数；
+     * $error 非空表示扣费本身执行失败（如表缺 balance 列），调用方应报系统错误而不是「余额不足」。
+     */
+    public static function charge($id, $amount, &$error = null)
+    {
+        $amount = round((float)$amount, 2);
+        if ($amount <= 0) {
+            return [true, self::balanceOf($id)];
+        }
+        try {
+            $affected = \think\Db::name(self::KEY_TABLE)
+                ->where('id', (int)$id)
+                ->where('status', 1)
+                ->where('balance', '>=', $amount)
+                ->update([
+                    'balance'     => \think\Db::raw('`balance` - ' . $amount),
+                    'update_time' => date('Y-m-d H:i:s'),
+                ]);
+            if ((int)$affected < 1) {
+                return [false, self::balanceOf($id)];
+            }
+            return [true, self::balanceOf($id)];
+        } catch (\Throwable $e) {
+            $error = $e->getMessage();
+            return [false, self::balanceOf($id)];
+        }
+    }
+
+    /** 退费（转发失败时原路退回预扣金额），返回退后余额 */
+    public static function refund($id, $amount)
+    {
+        $amount = round((float)$amount, 2);
+        if ($amount <= 0) {
+            return self::balanceOf($id);
+        }
+        try {
+            \think\Db::name(self::KEY_TABLE)->where('id', (int)$id)->update([
+                'balance'     => \think\Db::raw('`balance` + ' . $amount),
+                'update_time' => date('Y-m-d H:i:s'),
+            ]);
+        } catch (\Throwable $_) {}
+        return self::balanceOf($id);
+    }
+
+    /** 充值（正数加、负数减；扣减时余额不足返回 false），返回 [是否成功, 变动后余额] */
+    public static function recharge($id, $amount)
+    {
+        $amount = round((float)$amount, 2);
+        if ($amount >= 0) {
+            try {
+                \think\Db::name(self::KEY_TABLE)->where('id', (int)$id)->update([
+                    'balance'     => \think\Db::raw('`balance` + ' . $amount),
+                    'update_time' => date('Y-m-d H:i:s'),
+                ]);
+                return [true, self::balanceOf($id)];
+            } catch (\Throwable $_) {
+                return [false, self::balanceOf($id)];
+            }
+        }
+        // 扣减：不限制状态（停用的客户也要能扣款/退款），条件更新防止扣成负数
+        try {
+            $affected = \think\Db::name(self::KEY_TABLE)
+                ->where('id', (int)$id)
+                ->where('balance', '>=', -$amount)
+                ->update([
+                    'balance'     => \think\Db::raw('`balance` + ' . $amount),
+                    'update_time' => date('Y-m-d H:i:s'),
+                ]);
+            if ((int)$affected < 1) {
+                return [false, self::balanceOf($id)];
+            }
+            return [true, self::balanceOf($id)];
+        } catch (\Throwable $_) {
+            return [false, self::balanceOf($id)];
+        }
     }
 
     // ==================== 调用日志 ====================
