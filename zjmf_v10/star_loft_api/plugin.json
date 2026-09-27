@@ -1,0 +1,83 @@
+{
+    "name": "StarLoft API 中转",
+    "version": "1.0.0",
+    "description": "把 StarLoft 短信/人脸核验 API 转售给站点客户：客户独立密钥、站点中转、调用日志（智简魔方业务系统 v10）。",
+    "author": "StarLoft",
+    "website": "https://docs.starloft.cn/relay/plugin",
+    "plugin_type": "addon",
+    "dir": "star_loft_api",
+    "namespace": "addon\\star_loft_api",
+    "class": "StarLoftApi",
+    "requires": {
+        "php_version": ">=7.0",
+        "extensions": [
+            "curl",
+            "json"
+        ]
+    },
+    "config": {
+        "api_url": {
+            "title": "平台API地址",
+            "type": "text",
+            "required": true,
+            "default": "https://api.starloft.cn"
+        },
+        "api_key": {
+            "title": "平台API Key",
+            "type": "text",
+            "required": true
+        },
+        "api_secret": {
+            "title": "平台API Secret",
+            "type": "password",
+            "required": true
+        },
+        "admin_token": {
+            "title": "管理令牌",
+            "type": "text",
+            "required": false
+        },
+        "enable_sms": {
+            "title": "短信中转",
+            "type": "radio",
+            "options": {
+                "1": "启用",
+                "0": "关闭"
+            },
+            "required": false,
+            "default": "1"
+        },
+        "enable_fv": {
+            "title": "人脸中转",
+            "type": "radio",
+            "options": {
+                "1": "启用",
+                "0": "关闭"
+            },
+            "required": false,
+            "default": "1"
+        },
+        "endpoint_whitelist": {
+            "title": "端点白名单",
+            "type": "text",
+            "required": false,
+            "default": ""
+        },
+        "daily_quota": {
+            "title": "单客户日调用上限",
+            "type": "text",
+            "required": false,
+            "default": "0"
+        },
+        "log_enabled": {
+            "title": "记录调用日志",
+            "type": "radio",
+            "options": {
+                "1": "启用",
+                "0": "关闭"
+            },
+            "required": false,
+            "default": "1"
+        }
+    }
+}
