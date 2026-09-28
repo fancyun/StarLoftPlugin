@@ -14,7 +14,7 @@ use sms\starloft_sms\logic\SmsSdk;
  *
  * 对接「星楼网络」短信服务(SMS)：
  *   - 模板创建/查询/修改/删除：/v1/sms/templates（平台模板型，模板经平台/上游审核）
- *   - 发送：/v1/sms/send（按平台模板 ID 发送，模板内容变量由平台按 @ 顺序替换）
+ *   - 发送：/v1/sms/send（按平台模板 ID 发送，模板内容变量由上游按 {%变量%} 顺序替换）
  *
  * @author StarLoft
  * @version 3.0.0
@@ -87,7 +87,7 @@ class StarloftSms
     }
 
     /**
-     * 创建国内模板（@var(name) 占位转换为平台 @ 顺序占位）
+     * 创建国内模板（@var(name) 占位转换为平台 {%name%} 占位）
      * @param array $params ['title' => 模板标题, 'content' => 模板内容, 'config' => 配置]
      */
     public function createCnTemplate($params)
@@ -287,11 +287,11 @@ class StarloftSms
     }
 
     /**
-     * 将魔方 @var(name) 占位转换为平台 @ 顺序占位
+     * 将魔方 @var(name) 占位转换为联麓要求的 {%name%} 占位（平台按占位符先后顺序替换参数）
      */
     protected function convertContent($content)
     {
-        return preg_replace('/@var\([^)]*\)/', '@', (string)$content);
+        return preg_replace('/@var\(([^)]*)\)/', '{%$1%}', (string)$content);
     }
 
     /**
