@@ -11,7 +11,7 @@
 - ✅ 支持方向：**国内短信**（实现 `sendCnSms` / `getCnTemplate` / `createCnTemplate` / `putCnTemplate` / `deleteCnTemplate`）
 - ✅ 安装时自动导入魔方财务全部 29 个系统短信模板（`config/smsTemplate.php`）
 - ✅ 模板管理：模板提交后进入星楼网络平台审核，状态实时回查（审核中/通过/未通过）
-- ✅ 模板发送：按平台模板 ID 发送，`@var(变量)` 由插件按魔方参数顺序自动转换
+- ✅ 模板发送：按平台模板 ID 发送，`@var(变量)` 自动转换为联麓 `{%变量%}` 占位，参数按占位符顺序上送
 - ✅ 兼容旧版 `sendSms()`（模板型/直发型）调用
 - ✅ HMAC-SHA256 签名认证（X-Api-Key / X-Sign / X-Sign-Version / X-Timestamp）
 
@@ -57,7 +57,7 @@ starloft_sms/
 | 方法 | 说明 |
 |------|------|
 | `getCnTemplate($params)` | 获取国内模板状态，返回 `template.template_status`（0未提交/1审核中/2通过/3未通过） |
-| `createCnTemplate($params)` | 创建国内模板（title/content/config），内容 `@var(name)` 自动转换为平台 `@` 顺序占位 |
+| `createCnTemplate($params)` | 创建国内模板（title/content/config），内容 `@var(name)` 自动转换为 `{%name%}` 占位 |
 | `putCnTemplate($params)` | 修改国内模板（template_id/title/content/config），重置待审核并重新报备上游 |
 | `deleteCnTemplate($params)` | 删除国内模板（template_id/config） |
 | `sendCnSms($params)` | 发送国内短信（mobile/content/template_id/templateParam/config），按模板 ID 走平台发送 |
@@ -67,7 +67,7 @@ starloft_sms/
 - 模板管理：`POST/GET/PUT/DELETE /v1/sms/templates[/{id}]`
 - 发送：`POST /v1/sms/send`（`template_id` 为平台返回的模板 ID）
 - 鉴权头（每个请求必带）：`X-Api-Key`、`X-Sign`（`hex(HMAC-SHA256(api_secret, 原始请求体))`）、`X-Sign-Version: hmac_sha256`、`X-Timestamp`
-- 请求字段：`phone_number_set`（数组）、`template_id`、`template_params`（数组，按模板 `@` 顺序）、`sign_name`、`sms_type`
+- 请求字段：`phone_number_set`（数组）、`template_id`、`template_params`（数组，按模板 `{%变量%}` 占位顺序）、`sign_name`、`sms_type`
 
 ## 技术支持
 
