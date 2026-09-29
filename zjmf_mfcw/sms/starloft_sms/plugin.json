@@ -21,6 +21,18 @@
         ]
     },
     "config": {
+        "amount": {
+            "title": "单条短信费用",
+            "type": "text",
+            "required": false,
+            "default": "0"
+        },
+        "free": {
+            "title": "免费短信条数",
+            "type": "text",
+            "required": false,
+            "default": "0"
+        },
         "api_url": {
             "title": "API地址",
             "type": "text",

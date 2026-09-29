@@ -239,7 +239,7 @@ HTML;
     }
 
     /**
-     * 兼容旧版「短信发送型」接口：模板型/直发型发送
+     * 兼容旧版「短信发送型」接口：按模板 ID 发送（平台不支持内容直发）
      */
     public function sendSms($phones, $content = '', array $templateParams = [], $templateId = '', $smsType = '')
     {
@@ -251,10 +251,7 @@ HTML;
                 $params['content'] = $content;
             } else {
                 if ($templateId === '') {
-                    $templateId = (string)($config['template_id'] ?? '');
-                }
-                if ($templateId === '') {
-                    return ['code' => 400, 'message' => '未配置模板ID，请使用直发内容或配置默认模板'];
+                    return ['code' => 400, 'message' => '模板ID不能为空'];
                 }
                 $params['template_id'] = $templateId;
                 if (!empty($templateParams)) {
@@ -328,17 +325,26 @@ HTML;
         }, (string)$content);
     }
 
+    /**
+     * 把平台返回的原始错误整理为可操作的提示（模板与发送共用，保留平台原文）
+     */
     protected function describeSendError($msg)
     {
         if (mb_strpos($msg, '余额') !== false || mb_strpos($msg, '额度') !== false) {
             return '短信服务余额/额度不足,请联系管理员充值后重试。(返回:' . $msg . ')';
         }
-        if (mb_strpos($msg, '签名不存在') !== false || mb_strpos($msg, '尚未审核通过') !== false) {
-            return $msg . '（注意：插件配置中的「默认短信签名内容」必须填星楼网络平台「短信服务 → 签名管理」里已审核通过的签名内容本身，不含【】，不是自拟的签名名称；留空可自动使用最新已通过的签名）';
+        if (mb_strpos($msg, '请先在控制台提交并通过短信签名') !== false
+            || mb_strpos($msg, '签名不存在') !== false
+            || mb_strpos($msg, '尚未审核通过') !== false) {
+            return $msg . '（注意：模板须绑定一条已审核通过的签名；插件配置中的「默认短信签名内容」须填星楼网络平台「签名管理」里已审核通过的签名内容本身，不含【】，留空则自动使用账号最新一条已通过的签名）';
         }
-        if (mb_strpos($msg, '签名') !== false || mb_strpos($msg, '鉴权') !== false) {
-            return '短信服务鉴权失败(AppKey/签名配置错误),请联系管理员检查插件配置。(返回:' . $msg . ')';
+        if (mb_strpos($msg, '实名') !== false) {
+            return $msg . '（该账号尚未完成实名认证，请先在星楼网络平台完成个人实名认证）';
         }
-        return '短信发送失败:' . $msg;
+        if (mb_strpos($msg, '无权') !== false || mb_strpos($msg, '鉴权') !== false
+            || mb_strpos($msg, 'invalid api key') !== false || mb_strpos($msg, 'invalid signature') !== false) {
+            return '短信服务鉴权失败（API Key / API Secret 配置错误，或密钥权限不含短信端点），请联系管理员检查插件配置。(返回:' . $msg . ')';
+        }
+        return $msg;
     }
 }
