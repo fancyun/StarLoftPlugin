@@ -11,7 +11,7 @@
 - ✅ 支持方向：**国内短信**（实现 `sendCnSms` / `getCnTemplate` / `createCnTemplate` / `putCnTemplate` / `deleteCnTemplate`）
 - ✅ 安装时自动导入 v10 全部 21 个系统默认短信模板（`config/smsTemplate.php`）
 - ✅ 模板管理：模板提交后进入星楼网络平台审核，状态实时回查（审核中/通过/未通过）
-- ✅ 模板发送：按平台模板 ID 发送，`@var(变量)` 按顺序自动转换为联麓 `{%变量N%}` 占位，参数按占位符顺序上送
+- ✅ 模板发送：按平台模板 ID 发送，内容里的 `{变量}` 占位按顺序自动转换为联麓 `{%变量N%}` 占位，参数按占位符顺序上送
 - ✅ 兼容旧版 `sendSms()` 模板型调用（平台不支持内容直发）
 - ✅ HMAC-SHA256 签名认证（X-Api-Key / X-Sign / X-Sign-Version / X-Timestamp）
 
@@ -60,7 +60,7 @@ starloft_sms/
 | 方法 | 说明 |
 |------|------|
 | `getCnTemplate($params)` | 获取国内模板状态，返回 `template.template_status`（0未提交/1审核中/2通过/3未通过） |
-| `createCnTemplate($params)` | 创建国内模板（title/content/config），内容 `@var(name)` 按顺序自动转换为 `{%变量N%}` 占位 |
+| `createCnTemplate($params)` | 创建国内模板（title/content/config），内容 `{变量}` 占位按顺序自动转换为 `{%变量N%}` 占位 |
 | `putCnTemplate($params)` | 修改国内模板（template_id/title/content/config），重置待审核并重新报备上游 |
 | `deleteCnTemplate($params)` | 删除国内模板（template_id/config） |
 | `sendCnSms($params)` | 发送国内短信（mobile/content/template_id/templateParam/config），按模板 ID 走平台发送 |

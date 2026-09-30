@@ -63,7 +63,7 @@ class StarloftSms
     public function getCnTemplate($params)
     {
         try {
-            $sdk        = new SmsSdk($this->getPluginConfig());
+            $sdk        = new SmsSdk($this->configOf($params));
             $templateId = trim((string)($params['template_id'] ?? ''));
             if ($templateId === '') {
                 return ['status' => 'error', 'msg' => '模板ID不能为空'];
@@ -81,13 +81,13 @@ class StarloftSms
                     'msg'             => (string)($tpl['msg'] ?? ''),
                 ],
             ];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return ['status' => 'error', 'msg' => '系统错误: ' . $e->getMessage()];
         }
     }
 
     /**
-     * 创建国内模板（@var(name) 占位按顺序转换为 {%变量N%} 占位）
+     * 创建国内模板（内容里的 {变量名} 占位按顺序转换为 {%变量N%} 占位）
      * @param array $params ['title' => 模板标题, 'content' => 模板内容, 'config' => 配置]
      */
     public function createCnTemplate($params)
@@ -98,7 +98,7 @@ class StarloftSms
             if ($title === '' || $content === '') {
                 return ['status' => 'error', 'msg' => '模板标题与内容不能为空'];
             }
-            $config = $this->getPluginConfig();
+            $config = $this->configOf($params);
             $sdk    = new SmsSdk($config);
             // 优先使用模板传入的 sign_name，其次用全局配置；均留空时平台自动取该账号最新已通过的签名
             $signName = trim((string)($params['sign_name'] ?? ''));
@@ -122,7 +122,7 @@ class StarloftSms
                     'template_status' => (int)($tpl['template_status'] ?? 1),
                 ],
             ];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return ['status' => 'error', 'msg' => '系统错误: ' . $e->getMessage()];
         }
     }
@@ -139,7 +139,7 @@ class StarloftSms
             if ($templateId === '' || $content === '') {
                 return ['status' => 'error', 'msg' => '模板ID与内容不能为空'];
             }
-            $sdk    = new SmsSdk($this->getPluginConfig());
+            $sdk    = new SmsSdk($this->configOf($params));
             $result = $sdk->updateTemplate($templateId, ['content' => $this->convertContent($content)]);
             if (!SmsSdk::isSuccess($result)) {
                 return ['status' => 'error', 'msg' => (string)($result['message'] ?? '模板修改失败')];
@@ -152,7 +152,7 @@ class StarloftSms
                     'template_status' => (int)($tpl['template_status'] ?? 1),
                 ],
             ];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return ['status' => 'error', 'msg' => '系统错误: ' . $e->getMessage()];
         }
     }
@@ -168,12 +168,12 @@ class StarloftSms
             if ($templateId === '') {
                 return ['status' => 'error', 'msg' => '模板ID不能为空'];
             }
-            $result = (new SmsSdk($this->getPluginConfig()))->deleteTemplate($templateId);
+            $result = (new SmsSdk($this->configOf($params)))->deleteTemplate($templateId);
             if (!SmsSdk::isSuccess($result)) {
                 return ['status' => 'error', 'msg' => (string)($result['message'] ?? '模板删除失败')];
             }
             return ['status' => 'success'];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return ['status' => 'error', 'msg' => '系统错误: ' . $e->getMessage()];
         }
     }
@@ -188,7 +188,7 @@ class StarloftSms
     public function sendCnSms($params)
     {
         try {
-            $config       = $this->getPluginConfig();
+            $config       = $this->configOf($params);
             $sdk          = new SmsSdk($config);
             $mobile       = trim((string)($params['mobile'] ?? ''));
             $content      = (string)($params['content'] ?? '');
@@ -217,7 +217,7 @@ class StarloftSms
                 return ['status' => 'error', 'msg' => $this->describeSendError($msg), 'content' => $content];
             }
             return ['status' => 'success', 'content' => $this->substituteContent($content, $values), 'msg' => ''];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return ['status' => 'error', 'msg' => '系统错误: ' . $e->getMessage(), 'content' => $params['content'] ?? ''];
         }
     }
@@ -228,7 +228,7 @@ class StarloftSms
     public function sendSms($phones, $content = '', array $templateParams = [], $templateId = '', $smsType = '')
     {
         try {
-            $config = $this->getPluginConfig();
+            $config = $this->configOf([]);
             $sdk    = new SmsSdk($config);
             $params = ['phone_number_set' => $phones, 'sms_type' => $smsType];
             if ($content !== '') {
@@ -260,7 +260,7 @@ class StarloftSms
                     'message_sid' => (string)($result['data']['message_sid'] ?? ''),
                 ],
             ];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return ['code' => 1, 'message' => '系统错误: ' . $e->getMessage()];
         }
     }
@@ -268,12 +268,21 @@ class StarloftSms
     // ==================== 工具方法 ====================
 
     /**
-     * 按模板内容 @var(name) 出现顺序，将 templateParam 映射为平台顺序参数数组
+     * 归一化模板内容占位符：系统传入的是 {变量名}（系统模板里的 @var(变量名) 由系统转换而来），
+     * 此处再把未转换的 @var(变量名) 也统一成 {变量名}，后续按同一规则处理。
+     */
+    protected function normalizePlaceholders($content)
+    {
+        return preg_replace('/@var\(([^)]*)\)/', '{$1}', (string)$content);
+    }
+
+    /**
+     * 按模板内容 {变量名} 的出现顺序，将 templateParam 映射为平台顺序参数数组
      */
     protected function orderTemplateParams($content, array $templateParam)
     {
         $names = [];
-        if (preg_match_all('/@var\(([^)]+)\)/', (string)$content, $m)) {
+        if (preg_match_all('/\{([^}]*)\}/', $this->normalizePlaceholders($content), $m)) {
             $names = $m[1];
         }
         $values = [];
@@ -284,16 +293,16 @@ class StarloftSms
     }
 
     /**
-     * 将魔方 @var(name) 占位按出现顺序转换为联麓要求的 {%变量N%} 占位
+     * 将模板内容里的 {变量名} 占位按出现顺序转换为联麓要求的 {%变量N%} 占位
      * （联麓按占位符先后顺序填充参数，占位符内的名称仅作标识）
      */
     protected function convertContent($content)
     {
         $i = 0;
-        return preg_replace_callback('/@var\([^)]*\)/', function () use (&$i) {
+        return preg_replace_callback('/\{[^}]*\}/', function () use (&$i) {
             $i++;
             return '{%变量' . $i . '%}';
-        }, (string)$content);
+        }, $this->normalizePlaceholders($content));
     }
 
     /**
@@ -302,11 +311,11 @@ class StarloftSms
     protected function substituteContent($content, array $values)
     {
         $i = 0;
-        return preg_replace_callback('/@var\([^)]*\)/', function () use (&$i, $values) {
+        return preg_replace_callback('/\{[^}]*\}/', function () use (&$i, $values) {
             $v = isset($values[$i]) ? $values[$i] : '';
             $i++;
             return $v;
-        }, (string)$content);
+        }, $this->normalizePlaceholders($content));
     }
 
     /**
@@ -333,11 +342,14 @@ class StarloftSms
     }
 
     /**
-     * 读取插件配置：优先取系统注入的 getConfig()（框架存在时），
-     * 否则直接解析本目录 config.php 的默认值。
+     * 取插件配置：系统按调用把配置放在 $params['config']（与官方短信插件一致），
+     * 兼容框架注入的 getConfig()，最后回落本目录 config.php 的默认值。
      */
-    protected function getPluginConfig()
+    protected function configOf(array $params)
     {
+        if (isset($params['config']) && is_array($params['config']) && !empty($params['config'])) {
+            return $params['config'];
+        }
         if (method_exists($this, 'getConfig')) {
             try {
                 $c = $this->getConfig();
@@ -346,7 +358,6 @@ class StarloftSms
                 }
             } catch (\Throwable $e) {}
         }
-
         $defaults = [];
         $cfgFile = __DIR__ . '/config.php';
         if (is_file($cfgFile)) {
