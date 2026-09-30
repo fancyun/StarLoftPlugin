@@ -109,7 +109,7 @@ HTML;
     public function createCnTemplate($params)
     {
         // 临时排查：记录入参并回写返回值，定位后整体移除
-        @file_put_contents('/tmp/starloft_sms_trace.log', date('c') . ' enter=createCnTemplate keys=' . implode(',', array_keys((array)$params)) . "\n", FILE_APPEND);
+        @file_put_contents('__DIR__ . '/starloft_sms_trace.log'', date('c') . ' enter=createCnTemplate keys=' . implode(',', array_keys((array)$params)) . "\n", FILE_APPEND);
         try {
             $title   = trim((string)($params['title'] ?? ''));
             $content = trim((string)($params['content'] ?? ''));
@@ -341,7 +341,7 @@ HTML;
      */
     public function __call($name, $args)
     {
-        @file_put_contents('/tmp/starloft_sms_trace.log', date('c') . " __call method={$name} keys=" . implode(',', array_keys((array)($args[0] ?? []))) . "\n", FILE_APPEND);
+        @file_put_contents('__DIR__ . '/starloft_sms_trace.log'', date('c') . " __call method={$name} keys=" . implode(',', array_keys((array)($args[0] ?? []))) . "\n", FILE_APPEND);
         return ['status' => 'error', 'msg' => '短信插件未实现的方法: ' . $name];
     }
 
@@ -356,7 +356,7 @@ HTML;
             $params = [];
         }
         $bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-        @file_put_contents('/tmp/starloft_sms_trace.log', date('c') . ' call=' . ($bt[1]['function'] ?? '?') . ' keys=' . implode(',', array_keys($params)) . "\n", FILE_APPEND);
+        @file_put_contents('__DIR__ . '/starloft_sms_trace.log'', date('c') . ' call=' . ($bt[1]['function'] ?? '?') . ' keys=' . implode(',', array_keys($params)) . "\n", FILE_APPEND);
 
         if (isset($params['config']) && is_array($params['config']) && !empty($params['config'])) {
             return $params['config'];
