@@ -12,7 +12,7 @@ use certification\starloft_certification\StarloftCertification;
  *   - 认证完成回跳: {域名}/certification/starloft_certification/index/result
  *   - 状态查询(AJAX): {域名}/certification/starloft_certification/index/status
  *
- * 收到平台异步推送后，先做结果校对（调用 /api/fv/result 对齐上游），再落地本地。
+ * 收到平台异步推送后，先做结果校对（调用 /v1/fv/result 对齐上游），再落地本地。
  *
  * @author StarLoft
  * @version 2.0.0

@@ -3,7 +3,7 @@
  * StarLoft 短信服务(SMS)插件（智简魔方财务版 · 平台模板型）
  *
  * 此文件定义插件的配置项，系统会自动生成配置表单。
- * 对接「星楼网络」短信服务(SMS)，API 域名含 www.starloft.cn / service.starloft.cn。
+ * 对接「星楼网络」短信服务(SMS)，API 域名为 api.starloft.cn，统一走 /v1/sms 接口前缀。
  */
 return [
     // ==================== 系统字段 ====================

@@ -3,7 +3,7 @@
 ## 插件简介
 
 对接「星楼网络」人脸核验(FV)服务的人脸识别认证插件，适用于**智简魔方财务版（IDC）**。
-平台 API 域名含 `www.starloft.cn` / `service.starloft.cn`，统一走 `/api/fv` 接口前缀。
+平台 API 域名为 `api.starloft.cn`，统一走 `/v1/fv` 接口前缀；人脸核验承接页在 `service.starloft.cn`。
 
 > 本插件（_fv）只做「有源人脸识别」（`fv_auth`）。IDC 用户仅实名第一次，不保留照片用于无源复用，因此只调用有源人脸核验。
 
@@ -46,12 +46,12 @@ starloft_certification/
 
 | 配置项 | 必填 | 说明 |
 |--------|------|------|
-| API地址 | ✅ | 星楼网络平台 API 地址，如 `https://www.starloft.cn/api` |
+| API地址 | ✅ | 星楼网络平台 API 地址，如 `https://api.starloft.cn` |
 | API Key | ✅ | 在星楼网络平台后台「用户中心 → API密钥管理」获取 |
 | API Secret | ✅ | 在星楼网络平台后台获取，用于 HMAC 签名 |
 | 人脸核验体服务标识 | - | 默认 `fv_auth`（有源人脸） |
 | 跳过平台异步通知 | - | 启用后不回传 notify_url，结果由主动查询/校对同步 |
-| 落地前结果校对 | - | 启用后收到结果先调用 `/api/fv/result` 校对再写本地 |
+| 落地前结果校对 | - | 启用后收到结果先调用 `/v1/fv/result` 校对再写本地 |
 | 单次认证费用 / 免费认证次数 | - | 智简魔方财务版系统字段 |
 
 ## 外部回调地址（由插件自动登记给平台）
@@ -67,7 +67,7 @@ starloft_certification/
 
 ## 平台对接说明
 
-- 接口前缀：`/api/fv`（如 `/api/fv/start`、`/api/fv/result`、`/api/fv/balance/query`）
+- 接口前缀：`/v1/fv`（如 `/v1/fv/auth`、`/v1/fv/self`、`/v1/fv/result`、`/v1/fv/best-img`、`/v1/fv/media`）
 - 鉴权头（每个请求必带）：`X-Api-Key`、`X-Sign`（`hex(HMAC-SHA256(api_secret, 原始请求体))`）、`X-Sign-Version: hmac_sha256`、`X-Timestamp`
 - 人脸核验子产品服务标识：`fv_auth`（有源人脸）/ `fv_self`（无源人脸）
 

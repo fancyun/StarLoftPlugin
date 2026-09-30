@@ -262,7 +262,7 @@ class StarloftCertificationPlugin extends Plugin
     /**
      * 查询认证状态(前端轮询入口)
      *
-     * 每次查询调用 /api/fv/result，即为对上游的「结果校对」；校验出终态后才落地本地。
+     * 每次查询调用 /v1/fv/result，即为对上游的「结果校对」；校验出终态后才落地本地。
      */
     public function getStatus($certifi)
     {

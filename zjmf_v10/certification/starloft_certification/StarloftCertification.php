@@ -171,7 +171,7 @@ class StarloftCertification
     }
 
     /**
-     * 结果校对：调用 /api/fv/result 对齐上游最终状态后返回
+     * 结果校对：调用 /v1/fv/result 对齐上游最终状态后返回
      *
      * @return array ['status' => 0|1|2|4, 'msg' => ...]
      */
@@ -216,7 +216,7 @@ class StarloftCertification
     /**
      * 查询认证状态(前台轮询入口)
      *
-     * 每次查询调用 /api/fv/result，即为对上游的「结果校对」；校验出终态后才落地本地。
+     * 每次查询调用 /v1/fv/result，即为对上游的「结果校对」；校验出终态后才落地本地。
      */
     public function getStatus($certifi)
     {

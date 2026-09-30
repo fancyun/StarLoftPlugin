@@ -7,7 +7,7 @@
 3. 点击「配置」：
 
 ```
-API地址:    https://www.starloft.cn/api
+API地址:    https://api.starloft.cn
 API Key:    your_api_key_here
 API Secret: your_api_secret_here
 人脸核验:   fv_auth（默认）
