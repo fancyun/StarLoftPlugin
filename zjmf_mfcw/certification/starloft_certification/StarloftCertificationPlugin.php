@@ -170,7 +170,7 @@ class StarloftCertificationPlugin extends Plugin
         }
 
         $sign = (string)($data['sign'] ?? '');
-        if (!$this->verifyNotifySign($data, $sign)) {
+        if (!$this->verifyNotifySign($data, $sign, $params)) {
             return json_encode(['code' => 401, 'message' => 'signature verification failed']);
         }
 
@@ -179,7 +179,7 @@ class StarloftCertificationPlugin extends Plugin
             return json_encode(['code' => 400, 'message' => '缺少 biz_no']);
         }
 
-        $reconciled = $this->reconcile($bizNo);
+        $reconciled = $this->reconcile($bizNo, $params);
         $status     = (int)($reconciled['status'] ?? 4);
         if ($status !== 1 && $status !== 2) {
             $status = 4;
@@ -199,7 +199,10 @@ class StarloftCertificationPlugin extends Plugin
         $msg       = '正在查询核验结果...';
         if ($certifyId !== '') {
             try {
-                $res    = $this->getStatus(['certify_id' => $certifyId, 'sync' => 1]);
+                $query               = is_array($params) ? $params : [];
+                $query['certify_id'] = $certifyId;
+                $query['sync']       = 1;
+                $res    = $this->getStatus($query);
                 $status = (int)($res['status'] ?? 4);
                 $msg    = (string)($res['msg'] ?? '');
             } catch (\Throwable $e) {
@@ -399,12 +402,12 @@ class StarloftCertificationPlugin extends Plugin
      * 校验平台异步通知的 HMAC 签名
      * （与平台 buildNotifySign 一致：biz_no/cost/result_code/result_message/status 按名排序后 k=v&k=v）
      */
-    public function verifyNotifySign($data, $sign)
+    public function verifyNotifySign($data, $sign, $params = [])
     {
         if (!is_array($data) || !is_string($sign) || $sign === '') {
             return false;
         }
-        $config = $this->configOf([]);
+        $config = $this->configOf(is_array($params) ? $params : []);
         $secret = (string)($config['api_secret'] ?? '');
         if ($secret === '') {
             return false;
@@ -430,13 +433,13 @@ class StarloftCertificationPlugin extends Plugin
     /**
      * 结果校对：调用平台查询接口对齐上游最终状态，仅返回终态(1通过/2未通过)或处理中(4)
      */
-    public function reconcile($bizNo)
+    public function reconcile($bizNo, $params = [])
     {
         if ($bizNo === '') {
             return ['status' => 0, 'msg' => '缺少任务流水号'];
         }
         try {
-            $sdk    = new FvSdk($this->configOf([]));
+            $sdk    = new FvSdk($this->configOf(is_array($params) ? $params : []));
             $result = $sdk->queryResult(['biz_no' => $bizNo]);
             $cat    = FvSdk::classifyError($result);
 
