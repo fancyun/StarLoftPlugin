@@ -108,6 +108,8 @@ HTML;
      */
     public function createCnTemplate($params)
     {
+        // 临时排查：记录入参并回写返回值，定位后整体移除
+        @file_put_contents('/tmp/starloft_sms_trace.log', date('c') . ' enter=createCnTemplate keys=' . implode(',', array_keys((array)$params)) . "\n", FILE_APPEND);
         try {
             $title   = trim((string)($params['title'] ?? ''));
             $content = trim((string)($params['content'] ?? ''));
@@ -335,11 +337,27 @@ HTML;
     }
 
     /**
+     * 临时排查：记录魔方调用的方法名（含未实现的方法），定位后整体移除
+     */
+    public function __call($name, $args)
+    {
+        @file_put_contents('/tmp/starloft_sms_trace.log', date('c') . " __call method={$name} keys=" . implode(',', array_keys((array)($args[0] ?? []))) . "\n", FILE_APPEND);
+        return ['status' => 'error', 'msg' => '短信插件未实现的方法: ' . $name];
+    }
+
+    /**
      * 取插件配置：魔方按调用把配置放在 $params['config']（与官方短信插件一致），
      * 兼容框架注入的 getConfig()，最后回落本目录 config.php 的默认值。
      */
-    protected function configOf(array $params)
+    protected function configOf($params = [])
     {
+        // 临时排查：记录调用方方法名与入参键名，定位后整体移除
+        if (!is_array($params)) {
+            $params = [];
+        }
+        $bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+        @file_put_contents('/tmp/starloft_sms_trace.log', date('c') . ' call=' . ($bt[1]['function'] ?? '?') . ' keys=' . implode(',', array_keys($params)) . "\n", FILE_APPEND);
+
         if (isset($params['config']) && is_array($params['config']) && !empty($params['config'])) {
             return $params['config'];
         }
