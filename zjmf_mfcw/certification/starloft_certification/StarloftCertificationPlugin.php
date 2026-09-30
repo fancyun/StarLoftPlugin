@@ -60,6 +60,39 @@ class StarloftCertificationPlugin extends Plugin
     }
 
     /**
+     * 取插件配置：系统按调用把配置放在 $params['config']（与官方插件一致），
+     * 兼容框架注入的 getConfig()，最后回落本目录 config.php 的默认值。
+     */
+    protected function configOf($params = [])
+    {
+        if (is_array($params) && isset($params['config']) && is_array($params['config']) && !empty($params['config'])) {
+            return $params['config'];
+        }
+        if (method_exists($this, 'getConfig')) {
+            try {
+                $c = $this->getConfig();
+                if (is_array($c) && !empty($c)) {
+                    return $c;
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+        $defaults = [];
+        $cfgFile = __DIR__ . '/config.php';
+        if (is_file($cfgFile)) {
+            $arr = include $cfgFile;
+            if (is_array($arr)) {
+                foreach ($arr as $key => $item) {
+                    if (is_array($item) && array_key_exists('value', $item)) {
+                        $defaults[$key] = $item['value'];
+                    }
+                }
+            }
+        }
+        return $defaults;
+    }
+
+    /**
      * 前台自定义字段：姓名 / 身份证号由魔方系统实名表单自带字段收集，此处不再重复声明
      */
     public function collectionInfo($type = null)
@@ -83,7 +116,7 @@ class StarloftCertificationPlugin extends Plugin
     public function personal($certifi)
     {
         try {
-            $config = $this->getConfig();
+            $config = $this->configOf($certifi);
 
             $sdk = new FvSdk($config);
 
@@ -97,7 +130,7 @@ class StarloftCertificationPlugin extends Plugin
                 'name'    => $name,
                 'id_card' => $idCard,
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $errorMsg = '系统错误: ' . $e->getMessage();
             $this->writePersonalStatus([
                 'status'    => 4,
@@ -239,7 +272,7 @@ class StarloftCertificationPlugin extends Plugin
         }
 
         try {
-            $config = $this->getConfig();
+            $config = $this->configOf($certifi);
             $sdk    = new FvSdk($config);
             $result = $sdk->queryResult(['biz_no' => $certifyId, 'sync' => $this->resolveSyncFlag($certifi)]);
             $cat    = FvSdk::classifyError($result);
@@ -352,7 +385,7 @@ class StarloftCertificationPlugin extends Plugin
             }
 
             return $this->trackPollAndReturn($certifyId, 4, '查询中,请稍候...(' . $msg . ')', 'err', self::MAX_ERROR_COUNT);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return $this->trackPollAndReturn($certifyId, 4, '查询中,请稍候...(异常:' . $e->getMessage() . ')', 'err', self::MAX_ERROR_COUNT);
         }
     }
@@ -371,7 +404,7 @@ class StarloftCertificationPlugin extends Plugin
         if (!is_array($data) || !is_string($sign) || $sign === '') {
             return false;
         }
-        $config = $this->getConfig();
+        $config = $this->configOf([]);
         $secret = (string)($config['api_secret'] ?? '');
         if ($secret === '') {
             return false;
@@ -403,7 +436,7 @@ class StarloftCertificationPlugin extends Plugin
             return ['status' => 0, 'msg' => '缺少任务流水号'];
         }
         try {
-            $sdk    = new FvSdk($this->getConfig());
+            $sdk    = new FvSdk($this->configOf([]));
             $result = $sdk->queryResult(['biz_no' => $bizNo]);
             $cat    = FvSdk::classifyError($result);
 
@@ -433,7 +466,7 @@ class StarloftCertificationPlugin extends Plugin
             }
 
             return ['status' => 4, 'msg' => $orderMessage];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return ['status' => 4, 'msg' => '校对异常: ' . $e->getMessage()];
         }
     }

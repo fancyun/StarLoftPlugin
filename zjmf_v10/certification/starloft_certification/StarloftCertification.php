@@ -85,7 +85,7 @@ class StarloftCertification
                 return $this->failHtml('当前仅支持中国大陆居民身份证核验');
             }
 
-            $config = $this->getPluginConfig();
+            $config = $this->configOf($certifi);
 
             $sdk = new FvSdk($config);
 
@@ -181,7 +181,7 @@ class StarloftCertification
             return ['status' => 0, 'msg' => '缺少任务流水号'];
         }
         try {
-            $config = $this->getPluginConfig();
+            $config = $this->configOf([]);
             $sdk    = new FvSdk($config);
             $result = $sdk->queryResult(['biz_no' => $bizNo]);
             $cat    = FvSdk::classifyError($result);
@@ -232,7 +232,7 @@ class StarloftCertification
         }
 
         try {
-            $config = $this->getPluginConfig();
+            $config = $this->configOf($certifi);
             $sdk    = new FvSdk($config);
             $result = $sdk->queryResult(['biz_no' => $certifyId, 'sync' => $this->resolveSyncFlag($certifi)]);
             $cat    = FvSdk::classifyError($result);
@@ -416,7 +416,7 @@ class StarloftCertification
         if (!is_array($data) || !is_string($sign) || $sign === '') {
             return false;
         }
-        $config = $this->getPluginConfig();
+        $config = $this->configOf([]);
         $secret = (string)($config['api_secret'] ?? '');
         if ($secret === '') {
             return false;
@@ -443,8 +443,11 @@ class StarloftCertification
     // =========================================================
     // 辅助：插件配置读取
     // =========================================================
-    protected function getPluginConfig()
+    protected function configOf($params = [])
     {
+        if (is_array($params) && isset($params['config']) && is_array($params['config']) && !empty($params['config'])) {
+            return $params['config'];
+        }
         if (method_exists($this, 'getConfig')) {
             try {
                 $c = $this->getConfig();
