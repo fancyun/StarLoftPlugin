@@ -11,7 +11,7 @@
 
 - ✅ 个人实名：姓名 + 身份证号 + 人脸核验（`fv_auth`）
 - ✅ 企业实名：企业名称 + 统一社会信用代码 + 法人姓名 + 法人身份证号 + 法人人脸核验（`fv_auth`）
-- ✅ 收到结果后主动调用 `/api/fv/result` 做结果校对，落地前对齐上游
+- ✅ 支持平台异步通知（`notify_url` 回调）与认证完成回跳，收到结果先调用 `/v1/fv/result` 校对，对齐上游后再落地本地
 - ✅ 支持跳过平台异步通知（只靠主动查询/校对同步结果）
 - ✅ HMAC-SHA256 签名认证（X-Api-Key / X-Sign / X-Sign-Version / X-Timestamp）
 - ✅ 幂等保护：认证中任务自动复用，避免重复发单扣费
@@ -25,7 +25,9 @@ starloft_certification/
 │   ├── personal()            # 个人有源人脸核验
 │   ├── company()             # 企业法人扫脸
 │   ├── collectionInfo()      # 前台自定义字段
-│   └── getStatus()           # 查询/校对核验状态
+│   ├── getStatus()           # 查询/校对核验状态（AJAX 轮询）
+│   ├── callback()            # 平台异步通知入口（核验结果推送）
+│   └── result()              # 认证完成回跳页
 ├── logic/
 │   └── FvSdk.php            # StarLoft SDK（API 通信 + HMAC 签名 + 错误分类）
 ├── config.php                # 插件配置项
@@ -51,6 +53,17 @@ starloft_certification/
 | 跳过平台异步通知 | - | 启用后不回传 notify_url，结果由主动查询/校对同步 |
 | 落地前结果校对 | - | 启用后收到结果先调用 `/api/fv/result` 校对再写本地 |
 | 单次认证费用 / 免费认证次数 | - | 智简魔方财务版系统字段 |
+
+## 外部回调地址（由插件自动登记给平台）
+
+| 用途 | 地址 |
+|------|------|
+| 异步通知（核验结果推送） | `{站点域名}/certification/starloft_certification/callback?uid={用户ID}` |
+| 认证完成回跳 | `{站点域名}/certification/starloft_certification/result?uid={用户ID}` |
+| 状态查询（页面轮询） | `{站点域名}/certification/starloft_certification/getStatus` |
+
+- 异步通知为服务器到服务器调用（无登录态），插件按 `X-Api-Key` 对应的 `api_secret` 校验 `sign` 签名后，先调用 `/v1/fv/result` 校对再落地本地，并始终返回 HTTP 2xx，避免平台反复补推。
+- 若站点无法被平台公网访问，请在配置中启用「跳过平台异步通知」，由页面轮询与结果校对同步。
 
 ## 平台对接说明
 

@@ -16,6 +16,10 @@ use certification\starloft_certification\logic\FvSdk;
  *
  * 收到平台结果后，插件主动调用 /v1/fv/result 做一次「结果校对」，对齐上游后再落地本地。
  *
+ * 外部回调入口（MFCW 按 /certification/{目录名}/{方法} 路由到本类方法，无登录态）：
+ *   - 异步通知: {域名}/certification/starloft_certification/callback?uid=xxx
+ *   - 认证完成回跳: {域名}/certification/starloft_certification/result?uid=xxx
+ *
  * @author StarLoft
  * @version 2.0.0
  */
@@ -111,6 +115,65 @@ class StarloftCertificationPlugin extends Plugin
     public function company($certifi)
     {
         return $this->failHtml('企业实名暂不支持，请使用个人实名');
+    }
+
+    // =========================================================
+    // 外部回调：平台异步通知与认证完成回跳
+    // （MFCW 按 /certification/{目录名}/{方法} 路由到本类方法，无登录态）
+    // =========================================================
+
+    /**
+     * 平台异步通知入口（核验结果推送）
+     *
+     * 校验 HMAC 签名后，先调用平台查询接口做一次「结果校对」对齐上游最终状态，再落地本地；
+     * 始终返回 JSON（HTTP 2xx），避免平台按指数退避反复补推。
+     */
+    public function callback($params = [])
+    {
+        $body = file_get_contents('php://input');
+        $data = json_decode((string)$body, true);
+        if (!is_array($data) || empty($data)) {
+            $data = $_POST;
+        }
+
+        $sign = (string)($data['sign'] ?? '');
+        if (!$this->verifyNotifySign($data, $sign)) {
+            return json_encode(['code' => 401, 'message' => 'signature verification failed']);
+        }
+
+        $bizNo = trim((string)($data['biz_no'] ?? ''));
+        if ($bizNo === '') {
+            return json_encode(['code' => 400, 'message' => '缺少 biz_no']);
+        }
+
+        $reconciled = $this->reconcile($bizNo);
+        $status     = (int)($reconciled['status'] ?? 4);
+        if ($status !== 1 && $status !== 2) {
+            $status = 4;
+        }
+        $this->updateCertificationByBizNo($bizNo, $status, (string)($reconciled['msg'] ?? ''));
+
+        return json_encode(['code' => 0, 'message' => 'success']);
+    }
+
+    /**
+     * 认证完成回跳页（用户在上游完成核验后返回本站）
+     */
+    public function result($params = [])
+    {
+        $certifyId = $this->resolveCertifyId($_GET);
+        $status    = 4;
+        $msg       = '正在查询核验结果...';
+        if ($certifyId !== '') {
+            try {
+                $res    = $this->getStatus(['certify_id' => $certifyId, 'sync' => 1]);
+                $status = (int)($res['status'] ?? 4);
+                $msg    = (string)($res['msg'] ?? '');
+            } catch (\Throwable $e) {
+                $msg = '查询异常：' . $e->getMessage();
+            }
+        }
+        return $this->resultHtml($certifyId, $status, $msg);
     }
 
     /**
@@ -297,6 +360,135 @@ class StarloftCertificationPlugin extends Plugin
     protected function skipNotify($config)
     {
         return (int)($config['skip_notify'] ?? 0) === 1;
+    }
+
+    /**
+     * 校验平台异步通知的 HMAC 签名
+     * （与平台 buildNotifySign 一致：biz_no/cost/result_code/result_message/status 按名排序后 k=v&k=v）
+     */
+    public function verifyNotifySign($data, $sign)
+    {
+        if (!is_array($data) || !is_string($sign) || $sign === '') {
+            return false;
+        }
+        $config = $this->getConfig();
+        $secret = (string)($config['api_secret'] ?? '');
+        if ($secret === '') {
+            return false;
+        }
+
+        $fields = [
+            'biz_no'         => (string)($data['biz_no'] ?? ''),
+            'cost'           => sprintf('%.2f', (float)($data['cost'] ?? 0)),
+            'result_code'    => (string)($data['result_code'] ?? ''),
+            'result_message' => (string)($data['result_message'] ?? ''),
+            'status'         => (string)(int)($data['status'] ?? 0),
+        ];
+        ksort($fields);
+
+        $canonical = '';
+        foreach ($fields as $k => $v) {
+            $canonical .= ($canonical === '' ? '' : '&') . $k . '=' . $v;
+        }
+
+        return hash_equals(hash_hmac('sha256', $canonical, $secret), strtolower(trim($sign)));
+    }
+
+    /**
+     * 结果校对：调用平台查询接口对齐上游最终状态，仅返回终态(1通过/2未通过)或处理中(4)
+     */
+    public function reconcile($bizNo)
+    {
+        if ($bizNo === '') {
+            return ['status' => 0, 'msg' => '缺少任务流水号'];
+        }
+        try {
+            $sdk    = new FvSdk($this->getConfig());
+            $result = $sdk->queryResult(['biz_no' => $bizNo]);
+            $cat    = FvSdk::classifyError($result);
+
+            if ($cat !== FvSdk::ERR_CAT_SUCCESS) {
+                return ['status' => 4, 'msg' => (string)($result['message'] ?? $result['result_message'] ?? '校对中')];
+            }
+
+            $orderData    = is_array($result['data'] ?? null) ? $result['data'] : [];
+            $orderCode    = (int)($orderData['result_code'] ?? $orderData['status_code'] ?? $orderData['code'] ?? 0);
+            $orderMessage = (string)($orderData['result_message'] ?? $orderData['message'] ?? '');
+
+            if ($orderCode === 1000 || $orderMessage === 'SUCCESS') {
+                return ['status' => 1, 'msg' => '身份核验通过'];
+            }
+
+            $rejectMsgs = [
+                'PASS_LIVING_NOT_THE_SAME',
+                'NO_ID_CARD_NUMBER','ID_NUMBER_NAME_NOT_MATCH','NO_FACE_FOUND','NO_ID_PHOTO','PHOTO_FORMAT_ERROR',
+                'FAIL_LIVING_FACE_ATTACK',
+                'FAILED','CANCELLED','TIMEOUT',
+            ];
+            if (in_array($orderCode, [2000, 4000], true)
+                || ($orderCode === 3000 && in_array($orderMessage, $rejectMsgs, true))
+                || ($orderCode === 6000 && in_array($orderMessage, ['FAILED','CANCELLED','TIMEOUT'], true))) {
+                $failMsg = $this->translateResultMsg($orderMessage) ?: (string)($orderData['result_message'] ?? '身份核验未通过');
+                return ['status' => 2, 'msg' => $failMsg];
+            }
+
+            return ['status' => 4, 'msg' => $orderMessage];
+        } catch (\Exception $e) {
+            return ['status' => 4, 'msg' => '校对异常: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * 按平台流水号（biz_no）定位本机实名记录并更新状态
+     */
+    protected function updateCertificationByBizNo($bizNo, $status, $resultMsg = '')
+    {
+        try {
+            if (!class_exists('think\Db')) {
+                return false;
+            }
+            $tables = [
+                'im_host_user_certification',
+                'host_user_certification',
+                'im_certification_personal',
+                'certification_personal',
+            ];
+            foreach ($tables as $tbl) {
+                try {
+                    $rec = \think\Db::name($tbl)->where('certify_id', $bizNo)->find();
+                    if (!$rec) continue;
+                    \think\Db::name($tbl)->where('id', $rec['id'])->update([
+                        'status'    => $status,
+                        'auth_fail' => $status === 2 ? $resultMsg : '',
+                    ]);
+                    return true;
+                } catch (\Throwable $_) {}
+            }
+        } catch (\Throwable $_) {}
+        return false;
+    }
+
+    /**
+     * 认证完成回跳页 HTML
+     */
+    protected function resultHtml($certifyId, $status, $msg)
+    {
+        if ($status === 1) {
+            $tip = '<div style="color:#19be6b;font-weight:bold;">核验已通过，请前往会员中心查看。</div>';
+        } elseif ($status === 2) {
+            $tip = '<div style="color:#f56c6c;font-weight:bold;">核验未通过：' . htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') . '</div>';
+        } else {
+            $tip = '<div style="color:#e6a23c;">核验处理中：' . htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') . '</div>';
+        }
+        $cid = htmlspecialchars((string)$certifyId, ENT_QUOTES, 'UTF-8');
+        return <<<HTML
+<div class="kyc-result-container" style="text-align:center;padding:40px 20px;">
+    <h4 style="margin-bottom:16px;">身份核验</h4>
+    {$tip}
+    <p class="text-muted small" style="margin-top:12px;">任务流水号：{$cid}</p>
+    <a class="btn btn-primary" href="/" style="margin-top:16px;">返回会员中心</a>
+</div>
+HTML;
     }
 
     protected function describeStartError($cat, $msg)
