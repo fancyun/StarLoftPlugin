@@ -208,7 +208,7 @@ class SmsSdk
     }
 
     /**
-     * 查询短信模板状态（支持按主键或上游模板 ID）
+     * 查询短信模板状态（按平台模板主键）
      */
     public function getTemplate($id)
     {

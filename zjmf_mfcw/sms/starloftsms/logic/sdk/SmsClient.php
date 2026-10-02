@@ -63,9 +63,9 @@ class SmsClient
     }
 
     /**
-     * 查询短信模板状态（支持主键或上游模板 ID）
+     * 查询短信模板状态（按平台模板主键）
      *
-     * @param string|int $id 模板 ID
+     * @param string|int $id 平台模板主键
      * @return array {code, message, data:{template:{template_id, template_status, msg}}}
      */
     public function getTemplate($id)
@@ -76,7 +76,7 @@ class SmsClient
     /**
      * 修改短信模板内容（重置待审核并重新报备上游）
      *
-     * @param string|int $id 模板 ID
+     * @param string|int $id 平台模板主键
      * @param array $params {content}
      * @return array
      */
@@ -88,7 +88,7 @@ class SmsClient
     /**
      * 删除短信模板
      *
-     * @param string|int $id 模板 ID
+     * @param string|int $id 平台模板主键
      * @return array
      */
     public function deleteTemplate($id)
