@@ -273,7 +273,10 @@ class StarloftSms
      */
     protected function normalizePlaceholders($content)
     {
-        return preg_replace('/@var\(([^)]*)\)/', '{$1}', (string)$content);
+        // aliyun 同款 ${变量} 占位符
+        $content = preg_replace('/\$\{([^}]*)\}/', '{$1}', (string)$content);
+        // 系统模板 @var(变量) 占位符
+        return preg_replace('/@var\(([^)]*)\)/', '{$1}', $content);
     }
 
     /**
@@ -319,6 +322,50 @@ class StarloftSms
     }
 
     /**
+     * 系统调用到未实现的方法时统一返回错误，避免抛致命异常
+     */
+    public function __call($name, $args)
+    {
+        return ['status' => 'error', 'msg' => '短信插件未实现的方法: ' . $name];
+    }
+
+    /**
+     * 取插件配置：系统按调用把配置放在 $params['config']（与官方短信插件一致），
+     * 兼容框架注入的 getConfig()，最后回落本目录 config.php 的默认值。
+     */
+    protected function configOf($params = [])
+    {
+        if (!is_array($params)) {
+            $params = [];
+        }
+        if (isset($params['config']) && is_array($params['config']) && !empty($params['config'])) {
+            return $params['config'];
+        }
+        if (method_exists($this, 'getConfig')) {
+            try {
+                $c = $this->getConfig();
+                if (is_array($c) && !empty($c)) {
+                    return $c;
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+        $defaults = [];
+        $cfgFile = __DIR__ . '/config.php';
+        if (is_file($cfgFile)) {
+            $arr = include $cfgFile;
+            if (is_array($arr)) {
+                foreach ($arr as $key => $item) {
+                    if (is_array($item) && array_key_exists('value', $item)) {
+                        $defaults[$key] = $item['value'];
+                    }
+                }
+            }
+        }
+        return $defaults;
+    }
+
+    /**
      * 把平台返回的原始错误整理为可操作的提示（模板与发送共用，保留平台原文）
      */
     protected function describeSendError($msg)
@@ -339,37 +386,5 @@ class StarloftSms
             return '短信服务鉴权失败（API Key / API Secret 配置错误，或密钥权限不含短信端点），请联系管理员检查插件配置。(返回:' . $msg . ')';
         }
         return $msg;
-    }
-
-    /**
-     * 取插件配置：系统按调用把配置放在 $params['config']（与官方短信插件一致），
-     * 兼容框架注入的 getConfig()，最后回落本目录 config.php 的默认值。
-     */
-    protected function configOf(array $params)
-    {
-        if (isset($params['config']) && is_array($params['config']) && !empty($params['config'])) {
-            return $params['config'];
-        }
-        if (method_exists($this, 'getConfig')) {
-            try {
-                $c = $this->getConfig();
-                if (is_array($c) && !empty($c)) {
-                    return $c;
-                }
-            } catch (\Throwable $e) {}
-        }
-        $defaults = [];
-        $cfgFile = __DIR__ . '/config.php';
-        if (is_file($cfgFile)) {
-            $arr = include $cfgFile;
-            if (is_array($arr)) {
-                foreach ($arr as $key => $item) {
-                    if (is_array($item) && array_key_exists('value', $item)) {
-                        $defaults[$key] = $item['value'];
-                    }
-                }
-            }
-        }
-        return $defaults;
     }
 }
