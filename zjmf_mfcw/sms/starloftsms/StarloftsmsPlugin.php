@@ -1,8 +1,8 @@
 <?php
-namespace sms\starloft_sms;
+namespace sms\starloftsms;
 
 use app\admin\lib\Plugin;
-use sms\starloft_sms\logic\SmsSdk;
+use sms\starloftsms\logic\SmsSdk;
 
 /**
  * StarLoft 短信服务(SMS)插件（智简魔方财务版 · 平台模板型）
@@ -20,13 +20,14 @@ use sms\starloft_sms\logic\SmsSdk;
  * @author StarLoft
  * @version 3.0.0
  */
-class StarloftSmsPlugin extends Plugin
+class StarloftsmsPlugin extends Plugin
 {
     /**
-     * 插件基本信息（name 为类名不带 Plugin，作为魔方插件唯一标识）
+     * 插件基本信息（name 为类名不带 Plugin，作为魔方插件唯一标识；
+     * 必须为不含下划线的驼峰单词，魔方 zjmfhook/cmf_parse_name 按此规则路由）
      */
     public $info = [
-        'name'        => 'StarloftSms',
+        'name'        => 'Starloftsms',
         'title'       => 'StarLoft 短信服务',
         'description' => 'StarLoft 短信服务（平台模板型 · 国内短信）— 智简魔方财务版',
         'status'      => 1,
@@ -108,8 +109,6 @@ HTML;
      */
     public function createCnTemplate($params)
     {
-        // 临时排查：记录入参并回写返回值，定位后整体移除
-        @file_put_contents('__DIR__ . '/starloft_sms_trace.log'', date('c') . ' enter=createCnTemplate keys=' . implode(',', array_keys((array)$params)) . "\n", FILE_APPEND);
         try {
             $title   = trim((string)($params['title'] ?? ''));
             $content = trim((string)($params['content'] ?? ''));
@@ -291,7 +290,10 @@ HTML;
      */
     protected function normalizePlaceholders($content)
     {
-        return preg_replace('/@var\(([^)]*)\)/', '{$1}', (string)$content);
+        // aliyun 同款 ${变量} 占位符
+        $content = preg_replace('/\$\{([^}]*)\}/', '{$1}', (string)$content);
+        // 魔方系统模板 @var(变量) 占位符
+        return preg_replace('/@var\(([^)]*)\)/', '{$1}', $content);
     }
 
     /**
@@ -337,11 +339,10 @@ HTML;
     }
 
     /**
-     * 临时排查：记录魔方调用的方法名（含未实现的方法），定位后整体移除
+     * 魔方调用到未实现的方法时统一返回错误，避免抛致命异常
      */
     public function __call($name, $args)
     {
-        @file_put_contents('__DIR__ . '/starloft_sms_trace.log'', date('c') . " __call method={$name} keys=" . implode(',', array_keys((array)($args[0] ?? []))) . "\n", FILE_APPEND);
         return ['status' => 'error', 'msg' => '短信插件未实现的方法: ' . $name];
     }
 
@@ -351,13 +352,9 @@ HTML;
      */
     protected function configOf($params = [])
     {
-        // 临时排查：记录调用方方法名与入参键名，定位后整体移除
         if (!is_array($params)) {
             $params = [];
         }
-        $bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-        @file_put_contents('__DIR__ . '/starloft_sms_trace.log'', date('c') . ' call=' . ($bt[1]['function'] ?? '?') . ' keys=' . implode(',', array_keys($params)) . "\n", FILE_APPEND);
-
         if (isset($params['config']) && is_array($params['config']) && !empty($params['config'])) {
             return $params['config'];
         }

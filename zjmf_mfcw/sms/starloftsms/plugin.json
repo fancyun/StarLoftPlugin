@@ -5,9 +5,9 @@
     "author": "StarLoft",
     "website": "https://docs.starloft.cn/sms/plugin",
     "plugin_type": "sms",
-    "dir": "starloft_sms",
-    "namespace": "sms\\starloft_sms",
-    "class": "StarloftSmsPlugin",
+    "dir": "starloftsms",
+    "namespace": "sms\\starloftsms",
+    "class": "StarloftsmsPlugin",
     "support": {
         "cn": true,
         "global": false

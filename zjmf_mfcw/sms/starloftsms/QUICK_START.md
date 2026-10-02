@@ -2,7 +2,7 @@
 
 ## 📦 安装
 
-1. 将 `starloft_sms` 上传到 `/public/plugins/sms/starloft_sms/`（目录名与插件命名空间/类名必须一致）
+1. 将 `starloftsms` 上传到 `/public/plugins/sms/starloftsms/`（目录名必须为不含下划线的小写单词，与插件命名空间/类名严格一致）
 2. 后台：`系统设置 → 短信设置 → 短信接口` → 找到「StarLoft 短信服务」→ 点击「安装」（自动导入全部系统短信模板）
 3. 点击「配置」：
 
