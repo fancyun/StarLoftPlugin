@@ -19,21 +19,27 @@ class Relay
     /**
      * 可中转的端点白名单：endpoint 参数 => 平台路径 + 各 HTTP 方法所需权限码 + 计价配置键
      *
-     * 路径与权限码与平台 /v1/* 契约一一对应；客户只能按本表取值，不能传任意路径。
+     * 路径与权限码与平台 /v2/* 契约一一对应；客户只能按本表取值，不能传任意路径。
      */
     public static function endpoints()
     {
         return [
-            'sms/send'          => ['path' => '/v1/sms/send',      'methods' => ['POST' => 'sms_send'], 'price' => 'price_sms_send'],
-            'sms/signs'         => ['path' => '/v1/sms/signs',     'methods' => ['POST' => 'sms_sign']],
-            'sms/templates'     => ['path' => '/v1/sms/templates', 'methods' => ['POST' => 'sms_template_create']],
-            'sms/templates/:id' => [
-                'path'     => '/v1/sms/templates/%s',
+            'sms/send'               => ['path' => '/v2/sms/send',      'methods' => ['POST' => 'sms_send'], 'price' => 'price_sms_send'],
+            'sms/qualifications'     => ['path' => '/v2/sms/qualifications',     'methods' => ['POST' => 'sms_sign']],
+            'sms/qualifications/:id' => [
+                'path'     => '/v2/sms/qualifications/%s',
+                'methods'  => ['GET' => 'sms_sign_get'],
+                'needs_id' => true,
+            ],
+            'sms/signs'              => ['path' => '/v2/sms/signs',     'methods' => ['POST' => 'sms_sign']],
+            'sms/templates'          => ['path' => '/v2/sms/templates', 'methods' => ['POST' => 'sms_template_create']],
+            'sms/templates/:id'      => [
+                'path'     => '/v2/sms/templates/%s',
                 'methods'  => ['GET' => 'sms_template_get', 'PUT' => 'sms_template_update', 'DELETE' => 'sms_template_delete'],
                 'needs_id' => true,
             ],
-            'sms/report'        => ['path' => '/v1/sms/report',    'methods' => ['POST' => 'sms_report']],
-            'sms/replies'       => ['path' => '/v1/sms/replies',   'methods' => ['POST' => 'sms_replies']],
+            'sms/report'             => ['path' => '/v2/sms/report',    'methods' => ['POST' => 'sms_report']],
+            'sms/replies'            => ['path' => '/v2/sms/replies',   'methods' => ['POST' => 'sms_replies']],
         ];
     }
 
@@ -211,7 +217,7 @@ class Relay
         if ($apiUrl === '' || $key === '' || $secret === '') {
             return [false, '未配置平台 API 地址/密钥'];
         }
-        list($status, $raw, $err) = self::forward($apiUrl, $key, $secret, 'POST', '/v1/sms/report', '{"biz_no":"0"}');
+        list($status, $raw, $err) = self::forward($apiUrl, $key, $secret, 'POST', '/v2/sms/report', '{"biz_no":"0"}');
         if ($err !== '') {
             return [false, '连接失败：' . $err];
         }

@@ -33,7 +33,7 @@ class StarloftSmsRelayPlugin extends Plugin
         'description' => '把 StarLoft 短信 API 转售给站点客户：客户独立密钥、站点中转、调用日志 — 智简魔方财务版',
         'status'      => 1,
         'author'      => 'StarLoft',
-        'version'     => '1.0.0',
+        'version'     => '1.1.0',
         'help_url'    => 'https://docs.starloft.cn/relay/plugin/starloft_sms_relay',
     ];
 

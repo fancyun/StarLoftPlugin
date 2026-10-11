@@ -4,14 +4,14 @@
 
 对接「星楼网络」短信服务(SMS)的短信插件，适用于**智简魔方财务版（IDC）**，按魔方财务「短信接口」开发规范实现（**平台模板型 · 国内短信**）。
 
-平台 API 域名为 `api.starloft.cn`，统一走 `/v1/sms` 接口前缀。
+平台 API 域名为 `api.starloft.cn`，统一走 `/v2/sms` 接口前缀（创蓝 253 通道）。
 
 ## 功能特性
 
 - ✅ 支持方向：**国内短信**（实现 `sendCnSms` / `getCnTemplate` / `createCnTemplate` / `putCnTemplate` / `deleteCnTemplate`）
 - ✅ 安装时自动导入魔方财务全部 29 个系统短信模板（`config/smsTemplate.php`）
 - ✅ 模板管理：模板提交后进入星楼网络平台审核，状态实时回查（审核中/通过/未通过）
-- ✅ 模板发送：按平台模板 ID 发送，内容里的 `{变量}` 占位按顺序自动转换为联麓 `{%变量N%}` 占位，参数按占位符顺序上送
+- ✅ 模板发送：按平台模板 ID 发送，内容里的 `{变量}` 统一转换为平台变量占位 `{s}`，并随模板提交变量属性（类型 / 长度），参数按占位符顺序上送
 - ✅ 兼容旧版 `sendSms()` 模板型调用（平台不支持内容直发）
 - ✅ HMAC-SHA256 签名认证（X-Api-Key / X-Sign / X-Sign-Version / X-Timestamp）
 
@@ -55,7 +55,9 @@ starloftsms/
 | API Key | ✅ | 在星楼网络平台后台「用户中心 → API密钥管理」获取 |
 | API Secret | ✅ | 在星楼网络平台后台获取，用于 HMAC 签名 |
 | 默认短信签名内容 | - | 平台「短信服务 → 签名管理」中已审核通过的签名内容本身（不含【】，如 `星楼网络`），不是自拟的签名名称；留空则自动使用该账号最新一条已通过的签名 |
-| 默认短信类型 | - | verify / notify（暂不支持营销） |
+| 默认短信类型 | - | verify / notify（暂不支持营销；平台已把验证码归入通知） |
+| 模板变量类型 | - | 随模板报备上游的变量属性：字符型 / 整数型 / 小数型 / 字符数据混合型（默认字符型） |
+| 模板变量长度 | - | 变量长度（字，正整数，默认 20），须不小于变量实际内容长度 |
 | 单条短信费用 / 免费短信条数 | - | 智简魔方财务版系统字段 |
 
 ## 接口说明（魔方规范）
@@ -63,21 +65,21 @@ starloftsms/
 | 方法 | 说明 |
 |------|------|
 | `getCnTemplate($params)` | 获取国内模板状态，返回 `template.template_status`（0未提交/1审核中/2通过/3未通过） |
-| `createCnTemplate($params)` | 创建国内模板（title/content/config），内容 `{变量}` 占位按顺序自动转换为 `{%变量N%}` 占位 |
+| `createCnTemplate($params)` | 创建国内模板（title/content/config），内容 `{变量}` 统一转换为 `{s}`，并按 `{s}` 个数提交变量属性（type/length 取插件配置） |
 | `putCnTemplate($params)` | 修改国内模板（template_id/title/content/config），重置待审核并重新报备上游 |
 | `deleteCnTemplate($params)` | 删除国内模板（template_id/config） |
 | `sendCnSms($params)` | 发送国内短信（mobile/content/template_id/templateParam/config），按模板 ID 走平台发送 |
 
 ## 平台对接说明
 
-- 模板管理：`POST/GET/PUT/DELETE /v1/sms/templates[/{id}]`
-- 发送：`POST /v1/sms/send`（`template_id` 为平台返回的模板 ID）
+- 模板管理：`POST/GET/PUT/DELETE /v2/sms/templates[/{id}]`（创建/修改须带 `variables`：按 `{s}` 顺序的 `[{type,length}]`）
+- 发送：`POST /v2/sms/send`（`template_id` 为平台返回的模板 ID）
 - 鉴权头（每个请求必带）：`X-Api-Key`、`X-Sign`（`hex(HMAC-SHA256(api_secret, 原始请求体))`）、`X-Sign-Version: hmac_sha256`、`X-Timestamp`
-- 请求字段：`phone_number_set`（数组）、`template_id`、`template_params`（数组，按模板 `{%变量N%}` 占位顺序）、`sign_name`、`sms_type`
+- 请求字段：`phone_number_set`（数组）、`template_id`、`template_params`（数组，按模板 `{s}` 占位顺序）、`sign_name`、`sms_type`
 
 ## 技术支持
 
-- **版本**: v3.0.0
+- **版本**: v3.1.0
 - **兼容版本**: 智简魔方财务版 3.7.6+
 - **作者**: StarLoft
 - **文档**: https://docs.starloft.cn/sms/plugin

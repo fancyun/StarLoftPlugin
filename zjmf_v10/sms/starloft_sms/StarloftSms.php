@@ -13,11 +13,11 @@ use sms\starloft_sms\logic\SmsSdk;
  *   - 发送：sendCnSms（支持方向：国内）
  *
  * 对接「星楼网络」短信服务(SMS)：
- *   - 模板创建/查询/修改/删除：/v1/sms/templates（平台模板型，模板经平台/上游审核）
- *   - 发送：/v1/sms/send（按平台模板 ID 发送，模板内容变量由上游按 {%变量N%} 顺序替换）
+ *   - 模板创建/查询/修改/删除：/v2/sms/templates（平台模板型，模板经平台/上游审核）
+ *   - 发送：/v2/sms/send（按平台模板 ID 发送，模板内容变量由上游按 {s} 顺序替换）
  *
  * @author StarLoft
- * @version 3.0.0
+ * @version 3.1.0
  */
 class StarloftSms
 {
@@ -30,7 +30,7 @@ class StarloftSms
         'description' => 'StarLoft 短信服务（平台模板型 · 国内短信）— 智简魔方业务系统 v10',
         'status'      => 1,
         'author'      => 'StarLoft',
-        'version'     => '3.0.0',
+        'version'     => '3.1.0',
         'help_url'    => 'https://docs.starloft.cn/sms/plugin/starloft_sms',
     ];
 
@@ -87,7 +87,7 @@ class StarloftSms
     }
 
     /**
-     * 创建国内模板（内容里的 {变量名} 占位按顺序转换为 {%变量N%} 占位）
+     * 创建国内模板（内容里的 {变量名} 占位统一转换为 {s}，并按 {s} 个数生成变量属性）
      * @param array $params ['title' => 模板标题, 'content' => 模板内容, 'config' => 配置]
      */
     public function createCnTemplate($params)
@@ -105,9 +105,11 @@ class StarloftSms
             if ($signName === '') {
                 $signName = trim((string)($config['sign_name'] ?? ''));
             }
+            $converted = $this->convertContent($content);
             $result = $sdk->createTemplate([
                 'title'     => $title,
-                'content'   => $this->convertContent($content),
+                'content'   => $converted,
+                'variables' => $this->buildVariables($converted, $config),
                 'sms_type'  => (string)($config['sms_type'] ?? 'notify'),
                 'sign_name' => $signName,
             ]);
@@ -139,8 +141,13 @@ class StarloftSms
             if ($templateId === '' || $content === '') {
                 return ['status' => 'error', 'msg' => '模板ID与内容不能为空'];
             }
-            $sdk    = new SmsSdk($this->configOf($params));
-            $result = $sdk->updateTemplate($templateId, ['content' => $this->convertContent($content)]);
+            $config    = $this->configOf($params);
+            $sdk       = new SmsSdk($config);
+            $converted = $this->convertContent($content);
+            $result    = $sdk->updateTemplate($templateId, [
+                'content'   => $converted,
+                'variables' => $this->buildVariables($converted, $config),
+            ]);
             if (!SmsSdk::isSuccess($result)) {
                 return ['status' => 'error', 'msg' => (string)($result['message'] ?? '模板修改失败')];
             }
@@ -296,16 +303,37 @@ class StarloftSms
     }
 
     /**
-     * 将模板内容里的 {变量名} 占位按出现顺序转换为联麓要求的 {%变量N%} 占位
-     * （联麓按占位符先后顺序填充参数，占位符内的名称仅作标识）
+     * 将模板内容里的 {变量名} 占位统一转换为平台/上游（创蓝）要求的 {s} 占位
+     * （平台按 {s} 出现顺序对应变量1…变量n，变量属性随模板一并提交）
      */
     protected function convertContent($content)
     {
-        $i = 0;
-        return preg_replace_callback('/\{[^}]*\}/', function () use (&$i) {
-            $i++;
-            return '{%变量' . $i . '%}';
-        }, $this->normalizePlaceholders($content));
+        return preg_replace('/\{[^}]*\}/', '{s}', $this->normalizePlaceholders($content));
+    }
+
+    /**
+     * 按正文里的 {s} 占位个数生成变量属性（类型与长度取插件配置，默认 字符型 / 20 字）
+     * 平台强校验「{s} 个数 = 变量属性条数」，无变量时返回空数组
+     */
+    protected function buildVariables($content, $config)
+    {
+        $count = preg_match_all('/\{s\}/', (string)$content);
+        if (!$count) {
+            return [];
+        }
+        $type   = trim((string)($config['var_type'] ?? ''));
+        $length = (int)($config['var_length'] ?? 0);
+        if ($type === '') {
+            $type = '字符型';
+        }
+        if ($length <= 0) {
+            $length = 20;
+        }
+        $vars = [];
+        for ($i = 0; $i < $count; $i++) {
+            $vars[] = ['type' => $type, 'length' => $length];
+        }
+        return $vars;
     }
 
     /**

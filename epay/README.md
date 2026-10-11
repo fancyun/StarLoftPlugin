@@ -13,7 +13,7 @@
 patch/
 ├── admin/set.php                      # 改：短信接口设置加「星楼网络短信接口」；实名认证配置加「星楼网络人脸核身」
 ├── includes/functions.php             # 改：send_sms_common() 加 sms_api==5 分支
-├── includes/lib/sms/StarLoft.php      # 新增：短信通道（HMAC 签名 + /v1/sms/send）
+├── includes/lib/sms/StarLoft.php      # 新增：短信通道（HMAC 签名 + /v2/sms/send）
 ├── includes/lib/StarLoftCertify.php   # 新增：实名认证通道（/v1/fv/auth、/v1/fv/result、异步通知验签）
 ├── user/ajax.php                      # 改：注册时校验姓名/身份证并发起核身
 ├── user/ajax2.php                     # 改：certificate / cert_geturl 支持 cert_open==7
@@ -47,6 +47,7 @@ patch/
 要点：
 
 - 星楼网络**只支持模板发送**，不支持内容直发；短信文案与变量顺序在星楼网络平台侧维护，本通道按模板占位符顺序上送参数值；
+- 平台侧模板正文的变量占位统一写作 `{s}` 并配置变量属性（类型/长度），本通道只按顺序上送参数值；
 - 原版这些字段的语义是「模板ID」或「模板文案」（短信宝是文案），本通道统一按**模板 ID** 解析；
 - 各场景模板只需 1 个变量（原版只传 `code`：验证码、账单号、用户组名、订单号等）；
 - 平台侧账号须完成**个人实名认证**，API Key 权限须为 `all` 或包含 `sms_send`。
@@ -74,7 +75,7 @@ patch/
         ↓
 send_sms_common() → \lib\sms\StarLoft->send($phone,$param,$template_id,$sign)
         ↓
-POST /v1/sms/send  {phone_number_set, template_id, template_params[按顺序], sign_name}
+POST /v2/sms/send  {phone_number_set, template_id, template_params[按顺序], sign_name}
 ```
 
 **实名认证（注册时）**
@@ -106,5 +107,5 @@ user/ajax.php?act=reg → 校验验证码/姓名/身份证 → 建号 → POST /
 ## 七、技术支持
 
 - 平台 API 文档：https://docs.starloft.cn/api
-- 接口对齐：短信 `POST /v1/sms/send`；实名 `POST /v1/fv/auth`、`POST /v1/fv/result`、异步通知签名校验
+- 接口对齐：短信 `POST /v2/sms/send`（创蓝 253 通道）；实名 `POST /v1/fv/auth`、`POST /v1/fv/result`、异步通知签名校验
 - 作者：StarLoft

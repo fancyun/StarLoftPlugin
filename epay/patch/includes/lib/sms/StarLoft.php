@@ -4,7 +4,7 @@ namespace lib\sms;
 /**
  * 星楼网络（StarLoft）短信通道
  *
- * 对接平台 POST /v1/sms/send：按平台模板 ID 发送，模板参数按模板占位符顺序上送。
+ * 对接平台 POST /v2/sms/send：按平台模板 ID 发送，模板参数按模板占位符顺序上送。
  * 鉴权：X-Api-Key + X-Sign（HMAC-SHA256(api_secret, 原始请求体)）+ X-Sign-Version + X-Timestamp。
  *
  * 与其它通道的差异：$template 传的是「平台短信模板 ID」（不是模板文案），
@@ -54,7 +54,7 @@ class StarLoft
             'X-Sign-Version: hmac_sha256',
             'X-Timestamp: '.time(),
         ];
-        $resp = get_curl($this->url.'/v1/sms/send', $body, 0, 0, 0, 0, 0, $headers);
+        $resp = get_curl($this->url.'/v2/sms/send', $body, 0, 0, 0, 0, 0, $headers);
         $arr = json_decode((string)$resp, true);
         if(!is_array($arr)){
             return '接口无响应或返回内容无法解析'.($resp ? ('：'.mb_substr(strip_tags((string)$resp), 0, 200)) : '');

@@ -86,12 +86,14 @@ https://你的站点/addon/starloft_sms_relay/index/apiAdmin?token=你配置的�
 
 | `endpoint` | HTTP | 平台路径 | 权限码 | 平台实名要求 |
 |---|---|---|---|---|
-| `sms/send` | POST | `/v1/sms/send` | `sms_send` | 个人 |
-| `sms/signs` | POST | `/v1/sms/signs` | `sms_sign` | 个人 |
-| `sms/templates` | POST | `/v1/sms/templates` | `sms_template_create` | 个人 |
-| `sms/templates/:id` | GET / PUT / DELETE | `/v1/sms/templates/{id}` | `sms_template_get` / `_update` / `_delete` | 个人 |
-| `sms/report` | POST | `/v1/sms/report` | `sms_report` | 个人 |
-| `sms/replies` | POST | `/v1/sms/replies` | `sms_replies` | 个人 |
+| `sms/send` | POST | `/v2/sms/send` | `sms_send` | 个人 |
+| `sms/qualifications` | POST | `/v2/sms/qualifications` | `sms_sign` | 个人 |
+| `sms/qualifications/:id` | GET | `/v2/sms/qualifications/{id}` | `sms_sign_get` | 个人 |
+| `sms/signs` | POST | `/v2/sms/signs` | `sms_sign` | 个人 |
+| `sms/templates` | POST | `/v2/sms/templates` | `sms_template_create` | 个人 |
+| `sms/templates/:id` | GET / PUT / DELETE | `/v2/sms/templates/{id}` | `sms_template_get` / `_update` / `_delete` | 个人 |
+| `sms/report` | POST | `/v2/sms/report` | `sms_report` | 个人 |
+| `sms/replies` | POST | `/v2/sms/replies` | `sms_replies` | 个人 |
 
 带 `:id` 的端点通过 query 传 id：`?endpoint=sms/templates/:id&id=123`。
 
@@ -128,11 +130,11 @@ $resp = curl_exec($ch);
 
 ### 4.4 可选：让官方 SDK 直接复用（需站点 Nginx 加一条重写）
 
-官方 SDK 会把 `api_url` 与 `/v1/xxx` 拼在一起，用下面这条重写即可把 `/v1/*` 映射到中转端点，客户无需改 SDK 代码，只改 `api_url` 与密钥：
+官方 SDK 会把 `api_url` 与 `/v2/xxx` 拼在一起，用下面这条重写即可把 `/v2/*` 映射到中转端点，客户无需改 SDK 代码，只改 `api_url` 与密钥：
 
 ```nginx
-location ^~ /v1/ {
-    rewrite ^/v1/(.*)$ /addon/starloft_sms_relay/index/apiRelay?endpoint=$1 last;
+location ^~ /v2/ {
+    rewrite ^/v2/(.*)$ /addon/starloft_sms_relay/index/apiRelay?endpoint=$1 last;
 }
 ```
 
@@ -181,7 +183,7 @@ location ^~ /v1/ {
 
 ## 8. 技术支持
 
-- 版本：v1.0.0 ｜ 兼容：智简魔方业务系统 v10 3.7.6+
+- 版本：v1.1.0 ｜ 兼容：智简魔方业务系统 v10 3.7.6+
 - 平台 API 文档：<https://docs.starloft.cn/sms/api/v1>
 
 ---

@@ -5,7 +5,7 @@ namespace StarLoft\Sdk;
 /**
  * StarLoft SMS 客户端
  *
- * 接口前缀统一为 /v1/sms，API 域名 api.starloft.cn
+ * 接口前缀统一为 /v2/sms（创蓝 253 通道），API 域名 api.starloft.cn
  */
 class SmsClient
 {
@@ -33,7 +33,7 @@ class SmsClient
      */
     public function send(array $params)
     {
-        return $this->client->request('POST', '/v1/sms/send', $params);
+        return $this->client->request('POST', '/v2/sms/send', $params);
     }
 
     /**
@@ -47,19 +47,21 @@ class SmsClient
      */
     public function createSign(array $params)
     {
-        return $this->client->request('POST', '/v1/sms/signs', $params);
+        return $this->client->request('POST', '/v2/sms/signs', $params);
     }
 
     /**
      * 创建短信模板
      *
      * @param array $params
-     *   - title, content, sms_type, sign_name
+     *   - title, content（变量占位统一写作 {s}）, sms_type, sign_name
+     *   - variables: array 变量属性，按 {s} 出现顺序：[{type, length}]；type 取
+     *     字符型 / 整数型 / 小数型 / 字符数据混合型，length 为长度（字，正整数）；条数须等于 {s} 个数
      * @return array {code, message, data:{template:{template_id, template_status}}}
      */
     public function createTemplate(array $params)
     {
-        return $this->client->request('POST', '/v1/sms/templates', $params);
+        return $this->client->request('POST', '/v2/sms/templates', $params);
     }
 
     /**
@@ -70,19 +72,19 @@ class SmsClient
      */
     public function getTemplate($id)
     {
-        return $this->client->request('GET', '/v1/sms/templates/' . rawurlencode((string)$id));
+        return $this->client->request('GET', '/v2/sms/templates/' . rawurlencode((string)$id));
     }
 
     /**
-     * 修改短信模板内容（重置待审核并重新报备上游）
+     * 修改短信模板内容（重置待审核，由平台在上游人工报备）
      *
      * @param string|int $id 平台模板主键
-     * @param array $params {content}
+     * @param array $params {content, variables}（content 变量占位用 {s}，variables 规则同创建）
      * @return array
      */
     public function updateTemplate($id, array $params)
     {
-        return $this->client->request('PUT', '/v1/sms/templates/' . rawurlencode((string)$id), $params);
+        return $this->client->request('PUT', '/v2/sms/templates/' . rawurlencode((string)$id), $params);
     }
 
     /**
@@ -93,44 +95,39 @@ class SmsClient
      */
     public function deleteTemplate($id)
     {
-        return $this->client->request('DELETE', '/v1/sms/templates/' . rawurlencode((string)$id));
+        return $this->client->request('DELETE', '/v2/sms/templates/' . rawurlencode((string)$id));
     }
 
     /**
-     * 查询短信发送回执（按上游 taskId）
+     * 查询短信发送回执（创蓝为推送模式，平台只回显本地已落库的批次状态）
      *
-     * @param string $taskId 上游任务ID（发送接口返回的 request_id / message_sid）
-     * @param int    $pageNo
-     * @param int    $pageSize
-     * @return array {code, message, data:{task_id, reports}}
+     * @param string $bizNo 平台业务号（发送接口返回的 biz_no，推荐）
+     * @param string $taskId 上游消息号（创蓝 msgid，兼容保留）
+     * @return array {code, message, data:{biz_no, message_sid, status, resp_code, resp_time, reports}}
      */
-    public function queryReport($taskId, $pageNo = 1, $pageSize = 10)
+    public function queryReport($bizNo, $taskId = '')
     {
-        return $this->client->request('POST', '/v1/sms/report', [
-            'task_id'  => $taskId,
-            'page_no'  => $pageNo,
-            'page_size' => $pageSize,
-        ]);
+        $params = ['biz_no' => (string)$bizNo];
+        if ($taskId !== '') {
+            $params['task_id'] = (string)$taskId;
+        }
+        return $this->client->request('POST', '/v2/sms/report', $params);
     }
 
     /**
-     * 查询短信上行回复
+     * 查询短信上行回复（创蓝为推送模式，只查平台本地已落库记录）
      *
-     * @param string $date 回复日期 yyyyMMdd（可选，提供时先向上游拉取同步）
-     * @param string $taskId
+     * @param string $taskId 上游消息号（创蓝 msgid，可选，留空查本账号全部）
      * @param int    $pageNo
      * @param int    $pageSize
-     * @return array
+     * @return array {code, message, data:{total, replies}}
      */
-    public function queryReplies($date = '', $taskId = '', $pageNo = 1, $pageSize = 10)
+    public function queryReplies($taskId = '', $pageNo = 1, $pageSize = 10)
     {
         $params = ['page_no' => $pageNo, 'page_size' => $pageSize];
-        if ($date !== '') {
-            $params['date'] = $date;
-        }
         if ($taskId !== '') {
-            $params['task_id'] = $taskId;
+            $params['task_id'] = (string)$taskId;
         }
-        return $this->client->request('POST', '/v1/sms/replies', $params);
+        return $this->client->request('POST', '/v2/sms/replies', $params);
     }
 }
