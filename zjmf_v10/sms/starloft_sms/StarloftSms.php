@@ -17,7 +17,7 @@ use sms\starloft_sms\logic\SmsSdk;
  *   - 发送：/v2/sms/send（按平台模板 ID 发送，模板内容变量由上游按 {s} 顺序替换）
  *
  * @author StarLoft
- * @version 3.1.0
+ * @version 3.2.0
  */
 class StarloftSms
 {
@@ -30,7 +30,7 @@ class StarloftSms
         'description' => 'StarLoft 短信服务（平台模板型 · 国内短信）— 智简魔方业务系统 v10',
         'status'      => 1,
         'author'      => 'StarLoft',
-        'version'     => '3.1.0',
+        'version'     => '3.2.0',
         'help_url'    => 'https://docs.starloft.cn/sms/plugin/starloft_sms',
     ];
 
@@ -259,12 +259,14 @@ class StarloftSms
             if (!SmsSdk::isSuccess($result)) {
                 return ['code' => 1, 'message' => (string)($result['message'] ?? '短信发送失败'), 'data' => $result];
             }
+            $requestId = (string)($result['data']['request_id'] ?? $result['data']['biz_no'] ?? '');
             return [
                 'code'    => 0,
                 'message' => 'success',
                 'data'    => [
-                    'request_id'  => (string)($result['data']['request_id'] ?? ''),
-                    'message_sid' => (string)($result['data']['message_sid'] ?? ''),
+                    'request_id'  => $requestId,
+                    // 魔方旧接口要求 message_sid；平台不再暴露上游 ID，使用平台业务号兼容。
+                    'message_sid' => $requestId,
                 ],
             ];
         } catch (\Throwable $e) {

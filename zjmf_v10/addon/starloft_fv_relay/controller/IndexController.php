@@ -13,7 +13,7 @@ use addon\starloft_fv_relay\StarloftFvRelay;
  * 中转为原始 HTTP 输出（原样回传平台响应），不走框架页面渲染。
  *
  * @author StarLoft
- * @version 1.0.0
+ * @version 2.0.0
  */
 class IndexController
 {

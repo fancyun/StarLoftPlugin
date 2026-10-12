@@ -19,8 +19,8 @@ $relayUrl = $base . '/addon/starloft_sms_relay/index/apiRelay?endpoint=sms/send'
     <p>本站点把 StarLoft 短信接口以中转方式提供：你需要在服务端使用站点下发的「中转密钥」（access_key 与 access_secret），
         按 StarLoft 平台同一套签名规则调用本站点的中转地址，本站点校验后转发到星楼网络并原样返回结果。</p>
     <p><b>中转地址：</b><code><?php echo htmlspecialchars($relayUrl, ENT_QUOTES, 'UTF-8'); ?></code></p>
-    <p><b>请求头：</b><code>X-Api-Key</code>（中转密钥）、<code>X-Sign</code>（对请求体做 HMAC-SHA256）、
-        <code>X-Sign-Version: hmac_sha256</code>、<code>X-Timestamp</code>（秒级时间戳，容差 300 秒）。</p>
+    <p><b>请求头：</b><code>X-Api-Key</code>（中转密钥）、<code>X-Sign</code>（对 canonical 做 HMAC-SHA256）、
+        <code>X-Sign-Version: hmac_sha256_v2</code>、<code>X-Timestamp</code>、<code>X-Nonce</code>。</p>
     <p><b>可用端点：</b>短信发送 <code>sms/send</code>、签名 <code>sms/signs</code>、模板 <code>sms/templates</code>、
         模板详情 <code>sms/templates/:id</code>（带 <code>&amp;id=</code>）、发送回执 <code>sms/report</code>、
         上行回复 <code>sms/replies</code>。用 <code>?endpoint=</code> 指定。</p>

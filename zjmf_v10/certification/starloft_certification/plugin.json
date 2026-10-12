@@ -1,6 +1,6 @@
 {
     "name": "StarLoft 人脸核验",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "description": "对接「星楼网络」人脸核验(FV)服务的人脸识别认证插件（智简魔方业务系统 v10）。有源人脸核验（fv_auth），仅支持个人实名。",
     "author": "StarLoft",
     "website": "https://docs.starloft.cn/fv/plugin",

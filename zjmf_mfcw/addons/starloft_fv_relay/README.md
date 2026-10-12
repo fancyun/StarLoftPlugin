@@ -11,7 +11,7 @@
 
 1. 将 `starloft_fv_relay` 目录上传到 `/public/plugins/addons/starloft_fv_relay/`（**目录名必须与命名空间/类名一致**）。
 2. 后台进入插件管理，找到「StarLoft 人脸中转」并点击「安装」。
-   - 安装会尝试创建两张表（客户密钥表、调用日志表），表名带站点数据库前缀。**建表失败不影响安装**：中转仍可用，只是密钥管理页会提示，请把页面上给出的 SQL 交给 DBA 手工执行。
+   - 安装会尝试创建三张表（客户密钥表、调用日志表、防重放表），表名带站点数据库前缀。**建表失败不影响安装流程**：接口会安全拒绝请求，密钥管理页会提示，请把页面上给出的 SQL 交给 DBA 手工执行。
 3. 点击「配置」，填写平台 API 地址 / API Key / API Secret 与**管理令牌**。
 
 ## 2. 配置项
@@ -75,14 +75,15 @@ https://你的站点/addons/starloft_fv_relay/apiAdmin?token=你配置的管理�
 |----|----|
 | 请求地址 | `https://你的站点/addons/starloft_fv_relay/apiRelay?endpoint=<端点>` |
 | `X-Api-Key` | 客户的中转密钥（`sk_...`） |
-| `X-Sign` | `HMAC-SHA256(中转Secret, 原始请求体)` 的小写十六进制；GET/DELETE 无请求体时签空串 |
-| `X-Sign-Version` | 固定 `hmac_sha256` |
+| `X-Sign` | `HMAC-SHA256(中转Secret, canonical)` 的小写十六进制；canonical 绑定方法、请求路径、原始查询串、时间戳、nonce 与正文 SHA-256 |
+| `X-Sign-Version` | 固定 `hmac_sha256_v2` |
 | `X-Timestamp` | Unix 秒，与服务器时间相差不得超过 300 秒 |
+| `X-Nonce` | 每次请求唯一的随机字符串，至少 16 字符；10 分钟内不得重复 |
 | 请求体 | 与平台同端点的 JSON 入参**完全一致**（插件原样转发） |
 | 响应 | 原样回传平台响应与 HTTP 状态码（`{code,message,data}`） |
 | 响应头 | `X-Relay-Price` 本次扣费、`X-Relay-Balance` 扣后余额、`X-Relay-Units` 计费单位数 |
 
-端点也可用请求头 `X-Endpoint: fv/auth` 指定，此时 URL 不必带 query。
+`canonical` 按 `METHOD + "\\n" + PATH + "\\n" + RAW_QUERY + "\\n" + TIMESTAMP + "\\n" + NONCE + "\\n" + hex(SHA256(body))` 构造；路径和查询串必须与客户端实际请求 URL 完全一致。
 
 ### 4.2 可中转端点
 
@@ -98,18 +99,29 @@ https://你的站点/addons/starloft_fv_relay/apiAdmin?token=你配置的管理�
 
 ```bash
 B='{"biz_no":"2026..."}'
+REQ_PATH='/addons/starloft_fv_relay/apiRelay'
+RAW_QUERY='endpoint=fv/auth'
 TS=$(date +%s)
-SIG=$(printf '%s' "$B" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')
-curl -sS -X POST "https://你的站点/addons/starloft_fv_relay/apiRelay?endpoint=fv/auth" \
+NONCE=$(openssl rand -hex 16)
+BODY_HASH=$(printf '%s' "$B" | openssl dgst -sha256 | awk '{print $2}')
+CANONICAL=$(printf '%s\n%s\n%s\n%s\n%s\n%s' 'POST' "$REQ_PATH" "$RAW_QUERY" "$TS" "$NONCE" "$BODY_HASH")
+SIG=$(printf '%s' "$CANONICAL" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')
+curl -sS -X POST "https://你的站点$REQ_PATH?$RAW_QUERY" \
   -H "Content-Type: application/json" \
-  -H "X-Api-Key: $KEY" -H "X-Sign: $SIG" -H "X-Sign-Version: hmac_sha256" -H "X-Timestamp: $TS" \
+  -H "X-Api-Key: $KEY" -H "X-Sign: $SIG" -H "X-Sign-Version: hmac_sha256_v2" \
+  -H "X-Timestamp: $TS" -H "X-Nonce: $NONCE" \
   -d "$B"
 ```
 
 ```php
 $body = json_encode(['biz_no' => '2026...'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-$sign = hash_hmac('sha256', $body, $secret);
-$ch = curl_init('https://你的站点/addons/starloft_fv_relay/apiRelay?endpoint=fv/result');
+$path = '/addons/starloft_fv_relay/apiRelay';
+$query = 'endpoint=fv/result';
+$timestamp = (string)time();
+$nonce = bin2hex(random_bytes(16));
+$canonical = implode("\n", ['POST', $path, $query, $timestamp, $nonce, hash('sha256', $body)]);
+$sign = hash_hmac('sha256', $canonical, $secret);
+$ch = curl_init('https://你的站点' . $path . '?' . $query);
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_POST           => true,
@@ -118,8 +130,9 @@ curl_setopt_array($ch, [
         'Content-Type: application/json',
         'X-Api-Key: ' . $key,
         'X-Sign: ' . $sign,
-        'X-Sign-Version: hmac_sha256',
-        'X-Timestamp: ' . time(),
+        'X-Sign-Version: hmac_sha256_v2',
+        'X-Timestamp: ' . $timestamp,
+        'X-Nonce: ' . $nonce,
     ],
 ]);
 $resp = curl_exec($ch);
@@ -141,14 +154,16 @@ location ^~ /v1/ {
 
 | HTTP | `message` | 含义 |
 |---|---|---|
-| 401 | `missing required headers` | 四个鉴权头缺失 |
-| 400 | `unsupported sign version` | `X-Sign-Version` 不是 `hmac_sha256` |
+| 401 | `missing required headers` | 五个鉴权头缺失 |
+| 400 | `unsupported sign version` | `X-Sign-Version` 不是 `hmac_sha256_v2` |
 | 400 | `unknown endpoint（...）` | `endpoint` 缺失或不在白名单 |
 | 405 | `method not allowed for this endpoint` | 该端点不支持此 HTTP 方法 |
 | 401 | `invalid api key` | 中转密钥不存在 |
 | 403 | `api key disabled` | 密钥已停用 |
 | 401 | `invalid or expired timestamp` | 时间戳超出 ±300 秒 |
 | 401 | `invalid signature` | 签名不匹配（Secret 用错或请求体被改动） |
+| 400 | `invalid nonce` | nonce 长度不合法或包含换行 |
+| 401 | `replayed request` | 相同密钥的 nonce 在 10 分钟内重复使用 |
 | 403 | `密钥无权调用该接口（xxx）` | 客户权限不含该端点权限码 |
 | 403 | `该端点未开启中转` | 被端点白名单拦截 |
 | 429 | `超过当日调用上限（N）` | 命中单客户日上限 |
@@ -174,14 +189,14 @@ location ^~ /v1/ {
 | 访问中转端点 404 | 确认插件目录在 `/public/plugins/addons/starloft_fv_relay/`，且 URL 前缀为 `/addons/starloft_fv_relay/`；确认插件已安装启用 |
 | 上一条无误但仍 404 | 该魔方版本的 `addons` 插件不一定把入口方法直接暴露为免登录路由，需按官方文档用控制器或 `route.php` 暴露 `/addons/starloft_fv_relay/apiRelay` 与 `/addons/starloft_fv_relay/apiAdmin`（待确认） |
 | 一律 401 `missing required headers` | 站点 Nginx 未透传 `X-*` 头（部分 WAF 会丢弃下划线/自定义头），检查反代配置 |
-| 401 `invalid signature` | 签名串必须是**发送的原始请求体字节**；GET/DELETE 签空串；两边都别做 JSON 重排 |
+| 401 `invalid signature` | canonical 中的方法、路径、原始查询串、时间戳、nonce 或正文摘要与实际请求不一致 |
 | 平台返回 `code:403` | 平台账号实名等级不足或该 API 密钥权限不含对应端点 |
 | 管理页 403 | `?token=` 与管理令牌不一致，或未配置管理令牌 |
 | 日志表无数据 | 检查「记录调用日志」开关与建表是否成功 |
 
 ## 8. 技术支持
 
-- 版本：v1.0.0 ｜ 兼容：智简魔方财务版 3.7.6+
+- 版本：v2.0.0 ｜ 兼容：智简魔方财务版 3.7.6+
 - 平台 API 文档：<https://docs.starloft.cn/fv/api/v1>
 
 ---

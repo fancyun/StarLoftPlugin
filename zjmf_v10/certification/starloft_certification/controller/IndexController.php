@@ -15,7 +15,7 @@ use certification\starloft_certification\StarloftCertification;
  * 收到平台异步推送后，先做结果校对（调用 /v1/fv/result 对齐上游），再落地本地。
  *
  * @author StarLoft
- * @version 2.0.0
+ * @version 2.1.0
  */
 class IndexController
 {
@@ -47,10 +47,16 @@ class IndexController
             return;
         }
 
-        // 主动调用平台「结果校对」接口一次，对齐上游最终状态后再落地本地
-        $reconciled = $plugin->reconcile($bizNo);
-        $localStatus = (int)($reconciled['status'] ?? 0);
-        $resultMsg   = (string)($reconciled['msg'] ?? '');
+        // 视配置决定是否在落地前主动调用平台「结果校对」接口对齐上游最终状态；
+        // 关闭时直接采用通知体里的状态，少一次上游请求。
+        if ($plugin->requireReconcile()) {
+            $reconciled  = $plugin->reconcile($bizNo);
+            $localStatus = (int)($reconciled['status'] ?? 0);
+            $resultMsg   = (string)($reconciled['msg'] ?? '');
+        } else {
+            $localStatus = (int)($data['status'] ?? 4);
+            $resultMsg   = (string)($data['result_message'] ?? '');
+        }
 
         if (($localStatus === 1 || $localStatus === 2) && $resultMsg !== '') {
             $updated = $this->updateByCertifyId($bizNo, $localStatus, $resultMsg);
@@ -150,6 +156,9 @@ HTML;
         try {
             if (!class_exists('think\Db')) return false;
 
+            // auth_fail 仅承载「核验未通过」的失败原因；通过/处理中一律留空，避免前端把它当失败原因展示
+            $authFail = ((int)$status === 2) ? (string)$resultMsg : '';
+
             $tables = [
                 'host_certification_person',
                 'host_certification',
@@ -169,7 +178,7 @@ HTML;
 
                     \think\Db::name($tbl)->where('id', $rec['id'])->update([
                         'status'      => $status,
-                        'auth_fail'   => $resultMsg,
+                        'auth_fail'   => $authFail,
                         'update_time' => date('Y-m-d H:i:s'),
                     ]);
                     return true;
@@ -187,7 +196,7 @@ HTML;
                             if (!$rec) continue;
                             \think\Db::name($tblName)->where('id', $rec['id'])->update([
                                 'status'      => $status,
-                                'auth_fail'   => $resultMsg,
+                                'auth_fail'   => $authFail,
                                 'update_time' => date('Y-m-d H:i:s'),
                             ]);
                             return true;

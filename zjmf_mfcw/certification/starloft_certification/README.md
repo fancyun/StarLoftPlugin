@@ -13,7 +13,7 @@
 - ✅ 企业实名：企业名称 + 统一社会信用代码 + 法人姓名 + 法人身份证号 + 法人人脸核验（`fv_auth`）
 - ✅ 支持平台异步通知（`notify_url` 回调）与认证完成回跳，收到结果先调用 `/v1/fv/result` 校对，对齐上游后再落地本地
 - ✅ 支持跳过平台异步通知（只靠主动查询/校对同步结果）
-- ✅ HMAC-SHA256 签名认证（X-Api-Key / X-Sign / X-Sign-Version / X-Timestamp）
+- ✅ HMAC-SHA256 v2 签名认证（含方法、路径、时间戳、nonce 与正文摘要）
 - ✅ 幂等保护：认证中任务自动复用，避免重复发单扣费
 
 ## 目录结构
@@ -68,12 +68,12 @@ starloft_certification/
 ## 平台对接说明
 
 - 接口前缀：`/v1/fv`（如 `/v1/fv/auth`、`/v1/fv/self`、`/v1/fv/result`、`/v1/fv/best-img`、`/v1/fv/media`）
-- 鉴权头（每个请求必带）：`X-Api-Key`、`X-Sign`（`hex(HMAC-SHA256(api_secret, 原始请求体))`）、`X-Sign-Version: hmac_sha256`、`X-Timestamp`
+- 鉴权头（每个请求必带）：`X-Api-Key`、`X-Sign`（签名原文为方法、路径、查询串、时间戳、nonce、正文 SHA-256）、`X-Sign-Version: hmac_sha256_v2`、`X-Timestamp`、`X-Nonce`
 - 人脸核验子产品服务标识：`fv_auth`（有源人脸）/ `fv_self`（无源人脸）
 
 ## 技术支持
 
-- **版本**: v2.0.0
+- **版本**: v2.1.0
 - **兼容版本**: 智简魔方财务版 3.7.6+
 - **作者**: StarLoft
 - **文档**: https://docs.starloft.cn/fv/plugin

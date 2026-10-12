@@ -5,7 +5,7 @@ namespace lib\sms;
  * 星楼网络（StarLoft）短信通道
  *
  * 对接平台 POST /v2/sms/send：按平台模板 ID 发送，模板参数按模板占位符顺序上送。
- * 鉴权：X-Api-Key + X-Sign（HMAC-SHA256(api_secret, 原始请求体)）+ X-Sign-Version + X-Timestamp。
+ * 鉴权：hmac_sha256_v2，签名绑定方法、路径、时间戳、nonce 与正文摘要。
  *
  * 与其它通道的差异：$template 传的是「平台短信模板 ID」（不是模板文案），
  * 短信文案与变量顺序在星楼网络平台侧维护，本通道只按顺序上送参数值。
@@ -47,14 +47,19 @@ class StarLoft
             'sign_name' => (string)$sign,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
+        $path = '/v2/sms/send';
+        $timestamp = (string)time();
+        $nonce = bin2hex(random_bytes(16));
+        $canonical = implode("\n", ['POST', $path, '', $timestamp, $nonce, hash('sha256', $body)]);
         $headers = [
             'Content-Type: application/json',
             'X-Api-Key: '.$this->key,
-            'X-Sign: '.hash_hmac('sha256', $body, $this->secret),
-            'X-Sign-Version: hmac_sha256',
-            'X-Timestamp: '.time(),
+            'X-Sign: '.hash_hmac('sha256', $canonical, $this->secret),
+            'X-Sign-Version: hmac_sha256_v2',
+            'X-Timestamp: '.$timestamp,
+            'X-Nonce: '.$nonce,
         ];
-        $resp = get_curl($this->url.'/v2/sms/send', $body, 0, 0, 0, 0, 0, $headers);
+        $resp = get_curl($this->url.$path, $body, 0, 0, 0, 0, 0, $headers);
         $arr = json_decode((string)$resp, true);
         if(!is_array($arr)){
             return '接口无响应或返回内容无法解析'.($resp ? ('：'.mb_substr(strip_tags((string)$resp), 0, 200)) : '');

@@ -18,7 +18,7 @@ use addon\starloft_sms_relay\logic\Relay;
  *   - 免登录管理页：/addon/starloft_sms_relay/index/apiAdmin?token=xxx
  *
  * @author StarLoft
- * @version 1.0.0
+ * @version 2.0.0
  */
 class StarloftSmsRelay
 {
@@ -31,14 +31,14 @@ class StarloftSmsRelay
         'description' => '把 StarLoft 短信 API 转售给站点客户：客户独立密钥、站点中转、调用日志 — 智简魔方业务系统 v10',
         'status'      => 1,
         'author'      => 'StarLoft',
-        'version'     => '1.1.0',
+        'version'     => '2.0.0',
         'help_url'    => 'https://docs.starloft.cn/relay/plugin/starloft_sms_relay',
     ];
 
     /**
-     * 安装：创建客户密钥表与调用日志表（幂等）
+     * 安装：创建客户密钥表、调用日志表与防重放表（幂等）
      *
-     * 建表失败不阻断安装（中转仍可用，管理页会给出可手工执行的建表 SQL）。
+     * 建表失败不阻断安装；接口会安全拒绝请求，管理页会给出可手工执行的建表 SQL。
      */
     public function install()
     {

@@ -13,7 +13,7 @@
 - ✅ 模板管理：模板提交后进入星楼网络平台审核，状态实时回查（审核中/通过/未通过）
 - ✅ 模板发送：按平台模板 ID 发送，内容里的 `{变量}` 统一转换为平台变量占位 `{s}`，并随模板提交变量属性（类型 / 长度），参数按占位符顺序上送
 - ✅ 兼容旧版 `sendSms()` 模板型调用（平台不支持内容直发）
-- ✅ HMAC-SHA256 签名认证（X-Api-Key / X-Sign / X-Sign-Version / X-Timestamp）
+- ✅ HMAC-SHA256 v2 签名认证（含方法、路径、时间戳、nonce 与正文摘要）
 
 ## 目录结构
 
@@ -74,12 +74,12 @@ starloftsms/
 
 - 模板管理：`POST/GET/PUT/DELETE /v2/sms/templates[/{id}]`（创建/修改须带 `variables`：按 `{s}` 顺序的 `[{type,length}]`）
 - 发送：`POST /v2/sms/send`（`template_id` 为平台返回的模板 ID）
-- 鉴权头（每个请求必带）：`X-Api-Key`、`X-Sign`（`hex(HMAC-SHA256(api_secret, 原始请求体))`）、`X-Sign-Version: hmac_sha256`、`X-Timestamp`
+- 鉴权头（每个请求必带）：`X-Api-Key`、`X-Sign`（签名原文为方法、路径、查询串、时间戳、nonce、正文 SHA-256）、`X-Sign-Version: hmac_sha256_v2`、`X-Timestamp`、`X-Nonce`
 - 请求字段：`phone_number_set`（数组）、`template_id`、`template_params`（数组，按模板 `{s}` 占位顺序）、`sign_name`、`sms_type`
 
 ## 技术支持
 
-- **版本**: v3.1.0
+- **版本**: v3.2.0
 - **兼容版本**: 智简魔方财务版 3.7.6+
 - **作者**: StarLoft
 - **文档**: https://docs.starloft.cn/sms/plugin

@@ -15,6 +15,9 @@ class KeyStore
     /** 调用日志表（不含表前缀） */
     const LOG_TABLE = 'starloft_fv_relay_log';
 
+    /** 防重放 nonce 表（不含表前缀） */
+    const NONCE_TABLE = 'starloft_fv_relay_nonce';
+
     /**
      * 带表前缀的真实表名（ThinkPHP 前缀优先从 Query 取，其次读配置）
      */
@@ -54,6 +57,7 @@ class KeyStore
         try {
             \think\Db::execute(self::keyTableSql());
             \think\Db::execute(self::logTableSql());
+            \think\Db::execute(self::nonceTableSql());
         } catch (\Throwable $e) {
             $error = $e->getMessage();
             return false;
@@ -138,6 +142,19 @@ class KeyStore
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='StarLoft 人脸中转-调用日志'";
     }
 
+    /** 防重放 nonce 表建表 SQL */
+    public static function nonceTableSql()
+    {
+        $table = self::table(self::NONCE_TABLE);
+        return "CREATE TABLE IF NOT EXISTS `{$table}` (
+  `access_key` VARCHAR(64) NOT NULL,
+  `nonce_hash` CHAR(64) NOT NULL,
+  `expires_at` DATETIME NOT NULL,
+  PRIMARY KEY (`access_key`, `nonce_hash`),
+  KEY `idx_nonce_expires` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='StarLoft 中转请求 nonce 防重放'";
+    }
+
     /** 把多行结果统一成数组（ThinkPHP 的 select() 返回的是集合对象，不是数组） */
     protected static function rows($rows)
     {
@@ -199,6 +216,45 @@ class KeyStore
     public static function getByAccessKey($accessKey)
     {
         return self::row(\think\Db::name(self::KEY_TABLE)->where('access_key', (string)$accessKey)->find());
+    }
+
+    /** 原子占用请求 nonce；重复返回 false，存储异常通过 $error 返回。 */
+    public static function claimNonce($accessKey, $nonce, &$error = null)
+    {
+        $now = date('Y-m-d H:i:s');
+        $nonceHash = hash('sha256', (string)$nonce);
+        try {
+            \think\Db::name(self::NONCE_TABLE)->where('expires_at', '<', $now)->delete();
+            \think\Db::name(self::NONCE_TABLE)->insert([
+                'access_key' => (string)$accessKey,
+                'nonce_hash' => $nonceHash,
+                'expires_at' => date('Y-m-d H:i:s', time() + 600),
+            ]);
+            return true;
+        } catch (\Throwable $e) {
+            try {
+                \think\Db::execute(self::nonceTableSql());
+                \think\Db::name(self::NONCE_TABLE)->insert([
+                    'access_key' => (string)$accessKey,
+                    'nonce_hash' => $nonceHash,
+                    'expires_at' => date('Y-m-d H:i:s', time() + 600),
+                ]);
+                return true;
+            } catch (\Throwable $retryError) {
+                $e = $retryError;
+            }
+            try {
+                $exists = (int)\think\Db::name(self::NONCE_TABLE)
+                    ->where('access_key', (string)$accessKey)
+                    ->where('nonce_hash', $nonceHash)
+                    ->count();
+                if ($exists > 0) {
+                    return false;
+                }
+            } catch (\Throwable $_) {}
+            $error = $e->getMessage();
+            return false;
+        }
     }
 
     /** 按主键取值 */

@@ -6,8 +6,8 @@ namespace StarLoft\Sdk;
  * StarLoft API 基础客户端
  *
  * 鉴权：API Key + HMAC-SHA256 签名
- *   X-Api-Key / X-Sign=hex(HMAC-SHA256(api_secret, 原始请求体)) /
- *   X-Sign-Version: hmac_sha256 / X-Timestamp（Unix 秒，±5 分钟）
+ *   X-Api-Key / X-Sign=hex(HMAC-SHA256(api_secret, canonical)) /
+ *   X-Sign-Version: hmac_sha256_v2 / X-Timestamp / X-Nonce
  */
 class Client
 {
@@ -56,14 +56,20 @@ class Client
         }
 
         $timestamp = (string)time();
-        $sign      = hash_hmac('sha256', $body, $this->apiSecret);
+        $nonce     = bin2hex(random_bytes(16));
+        $parts     = parse_url($endpoint);
+        $path      = isset($parts['path']) ? (string)$parts['path'] : '/';
+        $query     = isset($parts['query']) ? (string)$parts['query'] : '';
+        $canonical = implode("\n", [$method, $path, $query, $timestamp, $nonce, hash('sha256', $body)]);
+        $sign      = hash_hmac('sha256', $canonical, $this->apiSecret);
 
         $headers = [
             'Content-Type: application/json',
             'X-Api-Key: ' . $this->apiKey,
             'X-Sign: ' . $sign,
-            'X-Sign-Version: hmac_sha256',
+            'X-Sign-Version: hmac_sha256_v2',
             'X-Timestamp: ' . $timestamp,
+            'X-Nonce: ' . $nonce,
         ];
 
         $ch = curl_init();

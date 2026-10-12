@@ -60,9 +60,10 @@ try{
 
 if($status == 1){
 	if(intval($userrow['cert']) != 1){
-		$DB->exec("update `pre_user` set `cert`=1,`certtime`=NOW() where `uid`=:uid and `cert`=0", [':uid'=>$uid]);
-		if($conf['cert_money'] > 0){
-			changeUserMoney($uid, $conf['cert_money'], false, '实名认证');
+		if($DB->exec("update `pre_user` set `cert`=1,`certtime`=NOW() where `uid`=:uid and `cert`=0", [':uid'=>$uid])){
+			if($conf['cert_money'] > 0){
+				changeUserMoney($uid, $conf['cert_money'], false, '实名认证');
+			}
 		}
 	}
 	exit(json_encode(['code'=>0, 'message'=>'success']));

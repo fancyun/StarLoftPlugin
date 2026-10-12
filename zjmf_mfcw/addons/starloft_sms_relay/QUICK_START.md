@@ -35,9 +35,10 @@ POST https://你的站点/addons/starloft_sms_relay/apiRelay?endpoint=sms/send
 
 ```
 X-Api-Key: sk_xxxx
-X-Sign: HMAC-SHA256(中转Secret, 原始请求体) 的小写十六进制
-X-Sign-Version: hmac_sha256
+X-Sign: HMAC-SHA256(中转Secret, canonical) 的小写十六进制
+X-Sign-Version: hmac_sha256_v2
 X-Timestamp: Unix 秒（±300 秒内）
+X-Nonce: 每次请求唯一的随机字符串（至少 16 字符）
 ```
 
 请求体 = 平台同端点的 JSON 入参原文；响应 = 平台响应原文。
@@ -46,11 +47,16 @@ X-Timestamp: Unix 秒（±300 秒内）
 
 ```bash
 B='{"phone_number_set":["13800000000"],"template_id":123,"template_params":["123456"]}'
+REQ_PATH='/addons/starloft_sms_relay/apiRelay'
+RAW_QUERY='endpoint=sms/send'
 TS=$(date +%s)
-SIG=$(printf '%s' "$B" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')
-curl -sS -X POST "https://你的站点/addons/starloft_sms_relay/apiRelay?endpoint=sms/send" \
+NONCE=$(openssl rand -hex 16)
+BODY_HASH=$(printf '%s' "$B" | openssl dgst -sha256 | awk '{print $2}')
+CANONICAL=$(printf '%s\n%s\n%s\n%s\n%s\n%s' 'POST' "$REQ_PATH" "$RAW_QUERY" "$TS" "$NONCE" "$BODY_HASH")
+SIG=$(printf '%s' "$CANONICAL" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')
+curl -sS -X POST "https://你的站点$REQ_PATH?$RAW_QUERY" \
   -H "Content-Type: application/json" -H "X-Api-Key: $KEY" -H "X-Sign: $SIG" \
-  -H "X-Sign-Version: hmac_sha256" -H "X-Timestamp: $TS" -d "$B"
+  -H "X-Sign-Version: hmac_sha256_v2" -H "X-Timestamp: $TS" -H "X-Nonce: $NONCE" -d "$B"
 ```
 
 预期：`invalid api key`=密钥错；平台业务错误（如 `模板不存在`、权限/实名提示）说明**中转已打通**。

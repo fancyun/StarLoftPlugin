@@ -21,7 +21,7 @@ use certification\starloft_certification\logic\FvSdk;
  *   - 认证完成回跳: {域名}/certification/starloft_certification/result?uid=xxx
  *
  * @author StarLoft
- * @version 2.0.0
+ * @version 2.1.0
  */
 class StarloftCertificationPlugin extends Plugin
 {
@@ -34,7 +34,7 @@ class StarloftCertificationPlugin extends Plugin
         'description' => 'StarLoft FV 人脸核验认证（有源人脸）— 智简魔方财务版',
         'status'      => 1,
         'author'      => 'StarLoft',
-        'version'     => '2.0.0',
+        'version'     => '2.1.0',
         'help_url'    => 'https://docs.starloft.cn/fv/plugin/starloft_certification'
     ];
 
@@ -179,12 +179,20 @@ class StarloftCertificationPlugin extends Plugin
             return json_encode(['code' => 400, 'message' => '缺少 biz_no']);
         }
 
-        $reconciled = $this->reconcile($bizNo, $params);
-        $status     = (int)($reconciled['status'] ?? 4);
+        // 视配置决定是否在落地前主动调用平台「结果校对」接口对齐上游最终状态；
+        // 关闭时直接采用通知体里的状态，少一次上游请求。
+        if ($this->requireReconcile($params)) {
+            $reconciled = $this->reconcile($bizNo, $params);
+            $status     = (int)($reconciled['status'] ?? 4);
+            $resultMsg  = (string)($reconciled['msg'] ?? '');
+        } else {
+            $status    = (int)($data['status'] ?? 4);
+            $resultMsg = (string)($data['result_message'] ?? '');
+        }
         if ($status !== 1 && $status !== 2) {
             $status = 4;
         }
-        $this->updateCertificationByBizNo($bizNo, $status, (string)($reconciled['msg'] ?? ''));
+        $this->updateCertificationByBizNo($bizNo, $status, $status === 2 ? $resultMsg : '');
 
         return json_encode(['code' => 0, 'message' => 'success']);
     }
@@ -428,6 +436,18 @@ class StarloftCertificationPlugin extends Plugin
         }
 
         return hash_equals(hash_hmac('sha256', $canonical, $secret), strtolower(trim($sign)));
+    }
+
+    /**
+     * 是否在收到异步通知后、落地本地状态前，额外主动调用「结果校对」接口对齐上游
+     *
+     * 由插件配置「落地前结果校对」(require_reconcile) 控制，默认启用；
+     * 关闭后通知处理直接采用通知体里的状态，少一次上游请求。
+     */
+    public function requireReconcile($params = [])
+    {
+        $config = $this->configOf(is_array($params) ? $params : []);
+        return (int)($config['require_reconcile'] ?? 1) === 1;
     }
 
     /**

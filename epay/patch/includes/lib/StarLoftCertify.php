@@ -11,7 +11,7 @@ use Exception;
  *   - POST /v1/fv/result  查询/校对结果，status：1-通过 2-未通过 4-处理中
  *   - 异步通知            平台按 biz_no/cost/result_code/result_message/status 排序后 HMAC-SHA256 签名
  *
- * 鉴权：X-Api-Key + X-Sign（HMAC-SHA256(api_secret, 原始请求体)）+ X-Sign-Version + X-Timestamp。
+ * 鉴权：hmac_sha256_v2，签名绑定方法、路径、时间戳、nonce 与正文摘要。
  */
 class StarLoftCertify
 {
@@ -104,12 +104,16 @@ class StarLoftCertify
             throw new Exception('未配置星楼网络API Key / API Secret');
         }
         $body = json_encode($post, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $timestamp = (string)time();
+        $nonce = bin2hex(random_bytes(16));
+        $canonical = implode("\n", ['POST', $path, '', $timestamp, $nonce, hash('sha256', $body)]);
         $headers = [
             'Content-Type: application/json',
             'X-Api-Key: '.$this->key,
-            'X-Sign: '.hash_hmac('sha256', $body, $this->secret),
-            'X-Sign-Version: hmac_sha256',
-            'X-Timestamp: '.time(),
+            'X-Sign: '.hash_hmac('sha256', $canonical, $this->secret),
+            'X-Sign-Version: hmac_sha256_v2',
+            'X-Timestamp: '.$timestamp,
+            'X-Nonce: '.$nonce,
         ];
         $resp = get_curl($this->url.$path, $body, 0, 0, 0, 0, 0, $headers);
         $arr = json_decode((string)$resp, true);

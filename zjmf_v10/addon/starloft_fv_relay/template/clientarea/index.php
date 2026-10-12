@@ -19,8 +19,8 @@ $relayUrl = $base . '/addon/starloft_fv_relay/index/apiRelay?endpoint=fv/auth';
     <p>本站点把 StarLoft 人脸核验接口以中转方式提供：你需要在服务端使用站点下发的「中转密钥」（access_key 与 access_secret），
         按 StarLoft 平台同一套签名规则调用本站点的中转地址，本站点校验后转发到星楼网络并原样返回结果。</p>
     <p><b>中转地址：</b><code><?php echo htmlspecialchars($relayUrl, ENT_QUOTES, 'UTF-8'); ?></code></p>
-    <p><b>请求头：</b><code>X-Api-Key</code>（中转密钥）、<code>X-Sign</code>（对请求体做 HMAC-SHA256）、
-        <code>X-Sign-Version: hmac_sha256</code>、<code>X-Timestamp</code>（秒级时间戳，容差 300 秒）。</p>
+    <p><b>请求头：</b><code>X-Api-Key</code>（中转密钥）、<code>X-Sign</code>（对 canonical 做 HMAC-SHA256）、
+        <code>X-Sign-Version: hmac_sha256_v2</code>、<code>X-Timestamp</code>、<code>X-Nonce</code>。</p>
     <p><b>可用端点：</b>有源人脸 <code>fv/auth</code>、无源人脸 <code>fv/self</code>、结果查询 <code>fv/result</code>、
         最佳图领取 <code>fv/best-img</code>、媒体读取 <code>fv/media</code>。用 <code>?endpoint=</code> 指定。</p>
     <p><b>计费：</b>调用成功才从预付余额扣减，平台返回失败会自动退还；余额不足时返回 402，请联系站点管理员充值。</p>

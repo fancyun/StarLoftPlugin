@@ -29,7 +29,7 @@ class SmsClient
      *   - session_context: string   下行上下文（透传，可选）
      *   - content:         string   完整短信内容（直发型，含【签名】）
      *   - notify_url:      string   回执主动推送地址（可选）
-     * @return array {code, message, data:{request_id, message_sid}}
+     * @return array {code, message, data:{biz_no, request_id}}
      */
     public function send(array $params)
     {

@@ -43,12 +43,13 @@ class Relay
         $started  = microtime(true);
         $method   = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'POST'));
         $body     = (string)file_get_contents('php://input');
-        $endpoint = trim((string)($_GET['endpoint'] ?? $_SERVER['HTTP_X_ENDPOINT'] ?? ''));
+        $endpoint = trim((string)($_GET['endpoint'] ?? ''));
 
         $apiKey    = trim((string)($_SERVER['HTTP_X_API_KEY'] ?? ''));
         $sign      = trim((string)($_SERVER['HTTP_X_SIGN'] ?? ''));
         $signVer   = trim((string)($_SERVER['HTTP_X_SIGN_VERSION'] ?? ''));
         $timestamp = trim((string)($_SERVER['HTTP_X_TIMESTAMP'] ?? ''));
+        $nonce     = trim((string)($_SERVER['HTTP_X_NONCE'] ?? ''));
 
         $ctx = [
             'cfg'      => $cfg,
@@ -58,11 +59,14 @@ class Relay
             'started'  => $started,
         ];
 
-        if ($apiKey === '' || $sign === '' || $signVer === '' || $timestamp === '') {
+        if ($apiKey === '' || $sign === '' || $signVer === '' || $timestamp === '' || $nonce === '') {
             self::reject($ctx, null, 401, 'missing required headers');
         }
-        if ($signVer !== 'hmac_sha256') {
+        if ($signVer !== 'hmac_sha256_v2') {
             self::reject($ctx, null, 400, 'unsupported sign version');
+        }
+        if (strlen($nonce) < 16 || strlen($nonce) > 128 || preg_match('/[\\r\\n]/', $nonce)) {
+            self::reject($ctx, null, 400, 'invalid nonce');
         }
 
         $map = self::endpoints();
@@ -93,9 +97,21 @@ class Relay
         if (abs(time() - (int)$timestamp) > self::TIMESTAMP_TOLERANCE) {
             self::reject($ctx, $client, 401, 'invalid or expired timestamp');
         }
-        $expect = hash_hmac('sha256', $body, (string)$client['access_secret']);
+        $requestUri = (string)($_SERVER['REQUEST_URI'] ?? '/');
+        $uriParts = parse_url($requestUri);
+        $canonicalPath = isset($uriParts['path']) ? (string)$uriParts['path'] : '/';
+        $rawQuery = isset($uriParts['query']) ? (string)$uriParts['query'] : '';
+        $canonical = implode("\n", [$method, $canonicalPath, $rawQuery, $timestamp, $nonce, hash('sha256', $body)]);
+        $expect = hash_hmac('sha256', $canonical, (string)$client['access_secret']);
         if (!hash_equals($expect, strtolower($sign))) {
             self::reject($ctx, $client, 401, 'invalid signature');
+        }
+        $nonceError = null;
+        if (!KeyStore::claimNonce($apiKey, $nonce, $nonceError)) {
+            if ($nonceError !== null) {
+                self::reject($ctx, $client, 500, 'nonce storage unavailable: ' . $nonceError);
+            }
+            self::reject($ctx, $client, 401, 'replayed request');
         }
 
         $need = (string)$rule['methods'][$method];
@@ -232,12 +248,16 @@ class Relay
     protected static function forward($apiUrl, $apiKey, $apiSecret, $method, $path, $body)
     {
         $signed  = in_array($method, ['POST', 'PUT'], true) ? (string)$body : '';
+        $timestamp = (string)time();
+        $nonce = bin2hex(random_bytes(16));
+        $canonical = implode("\n", [strtoupper($method), $path, '', $timestamp, $nonce, hash('sha256', $signed)]);
         $headers = [
             'Content-Type: application/json',
             'X-Api-Key: ' . $apiKey,
-            'X-Sign: ' . hash_hmac('sha256', $signed, $apiSecret),
-            'X-Sign-Version: hmac_sha256',
-            'X-Timestamp: ' . time(),
+            'X-Sign: ' . hash_hmac('sha256', $canonical, $apiSecret),
+            'X-Sign-Version: hmac_sha256_v2',
+            'X-Timestamp: ' . $timestamp,
+            'X-Nonce: ' . $nonce,
         ];
 
         $ch = curl_init();

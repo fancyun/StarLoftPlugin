@@ -168,9 +168,10 @@ if($conf['cert_open'] == 1){ //支付宝身份验证
 	}
 	if(intval($result['status']) == 1){
 		if(intval($userrow['cert']) != 1){
-			$DB->exec("update `pre_user` set `cert`=1,`certtime`='$date' where `uid`='$uid' and `cert`=0");
-			if($conf['cert_money']>0){
-				changeUserMoney($uid, $conf['cert_money'], false, '实名认证');
+			if($DB->exec("update `pre_user` set `cert`=1,`certtime`='$date' where `uid`='$uid' and `cert`=0")){
+				if($conf['cert_money']>0){
+					changeUserMoney($uid, $conf['cert_money'], false, '实名认证');
+				}
 			}
 		}
 	}elseif(intval($result['status']) == 2){

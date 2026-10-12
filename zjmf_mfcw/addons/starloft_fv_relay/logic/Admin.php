@@ -336,8 +336,8 @@ class Admin
         $h  = '<h2>客户端调用方式</h2>';
         $h .= '<div class="card">中转地址（用 <code>?endpoint=</code> 指定端点）：'
             . '<code>' . self::e($relay) . '</code><br>'
-            . '请求头：<code>X-Api-Key</code>（客户中转密钥）、<code>X-Sign</code>（对请求体做 HMAC-SHA256）、'
-            . '<code>X-Sign-Version: hmac_sha256</code>、<code>X-Timestamp</code>（秒级时间戳，容差 300 秒）。</div>';
+            . '请求头：<code>X-Api-Key</code>（客户中转密钥）、<code>X-Sign</code>（对 canonical 做 HMAC-SHA256）、'
+            . '<code>X-Sign-Version: hmac_sha256_v2</code>、<code>X-Timestamp</code>、<code>X-Nonce</code>。</div>';
 
         $h .= '<h2>可用端点</h2><table><thead><tr><th>端点</th><th>方法</th><th>所需权限码</th><th>单价(元)</th></tr></thead><tbody>';
         foreach (Relay::endpoints() as $endpoint => $rule) {
@@ -352,11 +352,17 @@ class Admin
         $h .= '</tbody></table>';
 
         $h .= '<h2>调用示例（以有源人脸核验为例）</h2><div class="card"><pre>'
-            . 'BODY=\'{"name":"张三","id_number":"11010119900307825X"}\'' . "\n"
+            . 'BODY=\'{"name":"张三","id_card":"11010119900307825X"}\'' . "\n"
+            . 'REQ_PATH=\'/addons/starloft_fv_relay/apiRelay\'' . "\n"
+            . 'RAW_QUERY=\'endpoint=fv/auth\'' . "\n"
             . 'TS=$(date +%s)' . "\n"
-            . 'SIGN=$(printf %s "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | awk \'{print $2}\')' . "\n"
-            . 'curl -sS -X POST "https://' . self::e($host) . '/addons/starloft_fv_relay/apiRelay?endpoint=fv/auth" \\' . "\n"
-            . '  -H "X-Api-Key: $KEY" -H "X-Sign: $SIGN" -H "X-Sign-Version: hmac_sha256" -H "X-Timestamp: $TS" \\' . "\n"
+            . 'NONCE=$(openssl rand -hex 16)' . "\n"
+            . 'BODY_HASH=$(printf %s "$BODY" | openssl dgst -sha256 | awk \'{print $2}\')' . "\n"
+            . 'CANONICAL=$(printf \'%s\\n%s\\n%s\\n%s\\n%s\\n%s\' POST "$REQ_PATH" "$RAW_QUERY" "$TS" "$NONCE" "$BODY_HASH")' . "\n"
+            . 'SIGN=$(printf %s "$CANONICAL" | openssl dgst -sha256 -hmac "$SECRET" | awk \'{print $2}\')' . "\n"
+            . 'curl -sS -X POST "https://' . self::e($host) . '$REQ_PATH?$RAW_QUERY" \\' . "\n"
+            . '  -H "X-Api-Key: $KEY" -H "X-Sign: $SIGN" -H "X-Sign-Version: hmac_sha256_v2" \\' . "\n"
+            . '  -H "X-Timestamp: $TS" -H "X-Nonce: $NONCE" \\' . "\n"
             . '  -H "Content-Type: application/json" -d "$BODY"</pre></div>';
 
         $h .= '<div class="card"><b>计费与对账</b><br>验签通过 → 按端点单价从预付余额预扣（余额不足直接返回 402）→ 转发到平台 → '
@@ -456,8 +462,9 @@ class Admin
     protected static function tableWarn(array $ctx)
     {
         return '<div class="warn"><b>数据表不可用：</b>' . self::e((string)$ctx['tableError'])
-            . '<p>中转仍可工作，但密钥管理不可用。请让 DBA 执行下面的 SQL 后刷新本页：</p>'
-            . '<pre>' . self::e(KeyStore::keyTableSql()) . "\n\n" . self::e(KeyStore::logTableSql()) . '</pre></div>';
+            . '<p>中转防重放与密钥管理不可用。请让 DBA 执行下面的 SQL 后刷新本页：</p>'
+            . '<pre>' . self::e(KeyStore::keyTableSql()) . "\n\n" . self::e(KeyStore::logTableSql())
+            . "\n\n" . self::e(KeyStore::nonceTableSql()) . '</pre></div>';
     }
 
     /** 列表里的「详情 / 修改」入口 */

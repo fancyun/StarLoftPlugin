@@ -18,7 +18,7 @@ use certification\starloft_certification\logic\FvSdk;
  * 收到平台结果后主动调用 /v1/fv/result 做结果校对再落地本地。
  *
  * @author StarLoft
- * @version 2.0.0
+ * @version 2.1.0
  */
 class StarloftCertification
 {
@@ -31,7 +31,7 @@ class StarloftCertification
         'description' => 'StarLoft FV 人脸核验认证（有源人脸）— 智简魔方业务系统 v10',
         'status'      => 1,
         'author'      => 'StarLoft',
-        'version'     => '2.0.0',
+        'version'     => '2.1.0',
         'help_url'    => 'https://docs.starloft.cn/fv/plugin/v10_fv',
     ];
 
@@ -438,6 +438,18 @@ class StarloftCertification
 
         $expect = hash_hmac('sha256', $canonical, $secret);
         return hash_equals($expect, strtolower(trim((string)$sign)));
+    }
+
+    /**
+     * 是否在收到异步通知后、落地本地状态前，额外主动调用「结果校对」接口对齐上游
+     *
+     * 由插件配置「落地前结果校对」(require_reconcile) 控制，默认启用；
+     * 关闭后通知处理直接采用通知体里的状态，少一次上游请求。
+     */
+    public function requireReconcile()
+    {
+        $config = $this->configOf([]);
+        return (int)($config['require_reconcile'] ?? 1) === 1;
     }
 
     // =========================================================
