@@ -37,7 +37,7 @@ starloftsms/
 
 1. 将 `starloftsms` 文件夹上传到 `/public/plugins/sms/starloftsms/`（**目录名必须为不含下划线的小写单词，与插件命名空间/类名严格对应**：`starloftsms` ↔ `sms\starloftsms\StarloftsmsPlugin`，魔方 `zjmfhook` 按 `小写目录 ↔ 首字母大写类名` 规则路由）。
 2. 后台进入 `系统设置 → 短信设置 → 短信接口`，找到「StarLoft 短信服务」点击「安装」（安装时自动导入全部短信模板）。
-3. 安装后点击「配置」，填写 API 地址 / API Key / API Secret / 默认短信签名内容 / 默认短信类型。
+3. 安装后点击「配置」，填写 API 地址 / API Key / API Secret / 默认短信签名内容。
 4. 在「短信模板」页面将模板提交审核（提交后自动上报星楼网络平台，平台/上游审核通过后模板状态为「通过」）。
 5. 在「发送设置」页选择 StarLoft 短信服务，保存后即可测试发送。
 
@@ -55,7 +55,6 @@ starloftsms/
 | API Key | ✅ | 在星楼网络平台后台「用户中心 → API密钥管理」获取 |
 | API Secret | ✅ | 在星楼网络平台后台获取，用于 HMAC 签名 |
 | 默认短信签名内容 | - | 平台「短信服务 → 签名管理」中已审核通过的签名内容本身（不含【】，如 `星楼网络`），不是自拟的签名名称；留空则自动使用该账号最新一条已通过的签名 |
-| 默认短信类型 | - | verify / notify（暂不支持营销；平台已把验证码归入通知） |
 | 模板变量类型 | - | 随模板报备上游的变量属性：字符型 / 整数型 / 小数型 / 字符数据混合型（默认字符型） |
 | 模板变量长度 | - | 变量长度（字，正整数，默认 20），须不小于变量实际内容长度 |
 | 单条短信费用 / 免费短信条数 | - | 智简魔方财务版系统字段 |
@@ -72,14 +71,14 @@ starloftsms/
 
 ## 平台对接说明
 
-- 模板管理：`POST/GET/PUT/DELETE /v2/sms/templates[/{id}]`（创建/修改须带 `variables`：按 `{s}` 顺序的 `[{type,length}]`）
-- 发送：`POST /v2/sms/send`（`template_id` 为平台返回的模板 ID）
+- 模板管理：`POST/GET/PUT/DELETE /v2/sms/templates[/{id}]`（创建/修改须带 `variables`：按 `{s}` 顺序的 `[{type,length}]`；**模板类别由平台在审核环节判定，创建时不传**）
+- 发送：`POST /v2/sms/send`（`template_id` 为平台返回的模板 ID；**短信类别由平台按所发模板自动匹配**）
 - 鉴权头（每个请求必带）：`X-Api-Key`、`X-Sign`（签名原文为方法、路径、查询串、时间戳、nonce、正文 SHA-256）、`X-Sign-Version: hmac_sha256_v2`、`X-Timestamp`、`X-Nonce`
-- 请求字段：`phone_number_set`（数组）、`template_id`、`template_params`（数组，按模板 `{s}` 占位顺序）、`sign_name`、`sms_type`
+- 请求字段：`phone_number_set`（数组）、`template_id`、`template_params`（数组，按模板 `{s}` 占位顺序）、`sign_name`
 
 ## 技术支持
 
-- **版本**: v3.2.0
+- **版本**: v3.3.0
 - **兼容版本**: 智简魔方财务版 3.7.6+
 - **作者**: StarLoft
 - **文档**: https://docs.starloft.cn/sms/plugin

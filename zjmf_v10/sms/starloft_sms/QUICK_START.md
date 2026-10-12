@@ -11,7 +11,6 @@ API地址:      https://api.starloft.cn
 API Key:      your_api_key_here
 API Secret:   your_api_secret_here
 默认短信签名内容:  星楼网络（填平台「签名管理」中已通过的签名内容本身，不含【】；留空自动使用最新已通过的签名）
-默认短信类型:  notify
 ```
 
 4. 在星楼网络平台[用户中心 → API密钥管理](https://console.starloft.cn/admin/login)获取 API Key / Secret
@@ -42,7 +41,7 @@ API Secret:   your_api_secret_here
 
 ## 💡 版本信息
 
-- 版本: v3.2.0
+- 版本: v3.3.0
 - 兼容: 智简魔方业务系统 v10
 - 作者: StarLoft
 

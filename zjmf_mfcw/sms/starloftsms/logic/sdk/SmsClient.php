@@ -25,10 +25,10 @@ class SmsClient
      *   - template_id:     string   模板ID（模板型必填）
      *   - template_params: string[] 模板参数（按模板变量顺序）
      *   - sign_name:       string   已审核签名
-     *   - sms_type:        string   verify/notify
      *   - session_context: string   下行上下文（透传，可选）
      *   - content:         string   完整短信内容（直发型，含【签名】）
      *   - notify_url:      string   回执主动推送地址（可选）
+     * 注：短信类别由平台按所发模板自动匹配（模板类别在平台审核时判定），请求无需也无法指定
      * @return array {code, message, data:{biz_no, request_id}}
      */
     public function send(array $params)
@@ -53,8 +53,10 @@ class SmsClient
     /**
      * 创建短信模板
      *
+     * 模板类别（验证码/通知/营销）由平台在审核环节判定填写，不在请求参数中传递
+     *
      * @param array $params
-     *   - title, content（变量占位统一写作 {s}）, sms_type, sign_name
+     *   - title, content（变量占位统一写作 {s}）, sign_name
      *   - variables: array 变量属性，按 {s} 出现顺序：[{type, length}]；type 取
      *     字符型 / 整数型 / 小数型 / 字符数据混合型，length 为长度（字，正整数）；条数须等于 {s} 个数
      * @return array {code, message, data:{template:{template_id, template_status}}}

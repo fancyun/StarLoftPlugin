@@ -106,11 +106,11 @@ class StarloftSms
                 $signName = trim((string)($config['sign_name'] ?? ''));
             }
             $converted = $this->convertContent($content);
+            // 模板类别由平台在审核环节判定填写，不在请求中传递
             $result = $sdk->createTemplate([
                 'title'     => $title,
                 'content'   => $converted,
                 'variables' => $this->buildVariables($converted, $config),
-                'sms_type'  => (string)($config['sms_type'] ?? 'notify'),
                 'sign_name' => $signName,
             ]);
             if (!SmsSdk::isSuccess($result)) {
@@ -216,7 +216,6 @@ class StarloftSms
                 'template_id'      => $templateId,
                 'template_params'  => $values,
                 'sign_name'        => trim((string)($config['sign_name'] ?? '')),
-                'sms_type'         => (string)($config['sms_type'] ?? 'notify'),
             ]);
 
             if (!SmsSdk::isSuccess($result)) {
@@ -231,13 +230,14 @@ class StarloftSms
 
     /**
      * 兼容旧版「短信发送型」接口：按模板 ID 发送（平台不支持内容直发）
+     * 短信类别由平台按所发模板自动匹配，无需（也不支持）指定
      */
-    public function sendSms($phones, $content = '', array $templateParams = [], $templateId = '', $smsType = '')
+    public function sendSms($phones, $content = '', array $templateParams = [], $templateId = '')
     {
         try {
             $config = $this->configOf([]);
             $sdk    = new SmsSdk($config);
-            $params = ['phone_number_set' => $phones, 'sms_type' => $smsType];
+            $params = ['phone_number_set' => $phones];
             if ($content !== '') {
                 $params['content'] = $content;
             } else {
@@ -248,11 +248,8 @@ class StarloftSms
                 if (!empty($templateParams)) {
                     $params['template_params'] = array_values($templateParams);
                 }
-                if (empty($params['sign_name']) && !empty($config['sign_name'])) {
+                if (!empty($config['sign_name'])) {
                     $params['sign_name'] = trim((string)$config['sign_name']);
-                }
-                if ($smsType === '' && !empty($config['sms_type'])) {
-                    $params['sms_type'] = (string)$config['sms_type'];
                 }
             }
             $result = $sdk->send($params);

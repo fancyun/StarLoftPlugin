@@ -152,9 +152,9 @@ class SmsSdk
      *   - template_id: 模板ID（模板型必填）
      *   - template_params: 模板参数数组（模板型，按模板变量顺序）
      *   - sign_name: 已审核签名
-     *   - sms_type: 短信类型（verify-验证码 notify-通知；暂不支持营销）
      *   - session_context: 下行上下文（透传，可选）
      *   - content: 完整短信内容（直发型，含【签名】；模板型忽略）
+     * 注：短信类别由平台按所发模板自动匹配（模板类别在平台审核时判定），请求无需也无法指定
      * @return array
      */
     public function send(array $params)
@@ -180,9 +180,6 @@ class SmsSdk
         if (!empty($params['sign_name'])) {
             $payload['sign_name'] = (string)$params['sign_name'];
         }
-        if (!empty($params['sms_type'])) {
-            $payload['sms_type'] = (string)$params['sms_type'];
-        }
         if (!empty($params['session_context'])) {
             $payload['session_context'] = (string)$params['session_context'];
         }
@@ -200,7 +197,9 @@ class SmsSdk
     /**
      * 创建短信模板（平台模板型）
      *
-     * @param array $data ['title', 'content'(@占位), 'sms_type', 'sign_name']
+     * 模板类别（验证码/通知/营销）由平台在审核环节判定填写，不在请求参数中传递
+     *
+     * @param array $data ['title', 'content'(@占位), 'sign_name', 'variables']
      */
     public function createTemplate(array $data)
     {
@@ -238,15 +237,13 @@ class SmsSdk
      * @param array $templateParams 模板参数（可选）
      * @param string $templateId 模板ID（可选，缺省用 config 默认）
      * @param string $signName 签名（可选，缺省用 config 默认）
-     * @param string $smsType 短信类型（可选）
      * @return array
      */
-    public function sendByTemplate($phones, array $templateParams = [], $templateId = '', $signName = '', $smsType = '')
+    public function sendByTemplate($phones, array $templateParams = [], $templateId = '', $signName = '')
     {
         $params = [
             'phone_number_set' => $phones,
             'template_params'  => $templateParams,
-            'sms_type'         => $smsType,
         ];
         if ($templateId !== '') $params['template_id'] = $templateId;
         if ($signName !== '') $params['sign_name'] = $signName;
