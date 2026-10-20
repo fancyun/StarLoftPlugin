@@ -13,7 +13,7 @@ use StarLoft\Sdk\SmsClient;
  * 本类保留插件侧错误分类与便捷发送逻辑。
  *
  * @author StarLoft
- * @version 3.2.0
+ * @version 3.3.0
  */
 class SmsSdk
 {

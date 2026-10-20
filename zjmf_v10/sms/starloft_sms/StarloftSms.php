@@ -17,7 +17,7 @@ use sms\starloft_sms\logic\SmsSdk;
  *   - 发送：/v2/sms/send（按平台模板 ID 发送，模板内容变量由上游按 {s} 顺序替换）
  *
  * @author StarLoft
- * @version 3.2.0
+ * @version 3.3.0
  */
 class StarloftSms
 {
@@ -30,7 +30,7 @@ class StarloftSms
         'description' => 'StarLoft 短信服务（平台模板型 · 国内短信）— 智简魔方业务系统 v10',
         'status'      => 1,
         'author'      => 'StarLoft',
-        'version'     => '3.2.0',
+        'version'     => '3.3.0',
         'help_url'    => 'https://docs.starloft.cn/sms/plugin/starloft_sms',
     ];
 
