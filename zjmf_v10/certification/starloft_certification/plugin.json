@@ -59,6 +59,18 @@
             },
             "required": false,
             "default": "1"
+        },
+        "min_age": {
+            "title": "最小年龄限制（周岁）",
+            "type": "text",
+            "required": false,
+            "default": "0"
+        },
+        "max_age": {
+            "title": "最大年龄限制（周岁）",
+            "type": "text",
+            "required": false,
+            "default": "0"
         }
     }
 }

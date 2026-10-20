@@ -74,6 +74,86 @@ class StarloftCertification
         return [];
     }
 
+    // =========================================================
+    // 年龄限制：由身份证号本地推算周岁
+    // （平台核验接口不返回年龄，故按身份证出生日期计算；
+    //   在发起核验前拦截，不符合的不消耗接口调用与费用）
+    // =========================================================
+
+    /**
+     * 按配置的最小/最大年龄校验身份证号
+     *
+     * @param string $idCard 身份证号
+     * @param array  $config 插件配置
+     * @return string 空字符串表示通过；非空为拒绝原因
+     */
+    protected function checkAgeLimit($idCard, array $config)
+    {
+        $min = (int)($config['min_age'] ?? 0);
+        $max = (int)($config['max_age'] ?? 0);
+        if ($min <= 0 && $max <= 0) {
+            return '';
+        }
+
+        $age = $this->ageFromIdCard($idCard);
+        if ($age === null) {
+            return '身份证号格式不正确，无法校验年龄，请核对后重新填写';
+        }
+        if ($min > 0 && $age < $min) {
+            return '很抱歉，需年满 ' . $min . ' 周岁才能通过实名认证（当前 ' . $age . ' 周岁）';
+        }
+        if ($max > 0 && $age > $max) {
+            return '很抱歉，超过 ' . $max . ' 周岁不能通过实名认证（当前 ' . $age . ' 周岁）';
+        }
+        return '';
+    }
+
+    /**
+     * 由中国大陆居民身份证号推算周岁
+     *
+     * 18 位：第 7-14 位为出生日期 YYYYMMDD；15 位（旧版）：第 7-12 位为 YYMMDD，年份补 19。
+     * 无法解析（长度/字符/日期非法、生日晚于今天）时返回 null。
+     *
+     * @param string $idCard
+     * @return int|null
+     */
+    protected function ageFromIdCard($idCard)
+    {
+        $id  = strtoupper(trim((string)$idCard));
+        $len = strlen($id);
+        if ($len === 18) {
+            if (!preg_match('/^\d{17}[\dX]$/', $id)) {
+                return null;
+            }
+            $birth = substr($id, 6, 8);
+        } elseif ($len === 15) {
+            if (!preg_match('/^\d{15}$/', $id)) {
+                return null;
+            }
+            $birth = '19' . substr($id, 6, 6);
+        } else {
+            return null;
+        }
+
+        $year  = (int)substr($birth, 0, 4);
+        $month = (int)substr($birth, 4, 2);
+        $day   = (int)substr($birth, 6, 2);
+        if ($year < 1900 || !checkdate($month, $day, $year)) {
+            return null;
+        }
+
+        try {
+            $birthday = new \DateTimeImmutable(sprintf('%04d-%02d-%02d 00:00:00', $year, $month, $day));
+            $today    = new \DateTimeImmutable('today');
+        } catch (\Throwable $e) {
+            return null;
+        }
+        if ($birthday > $today) {
+            return null;
+        }
+        return $birthday->diff($today)->y;
+    }
+
     /**
      * 个人实名认证入口（有源人脸）
      */
@@ -94,6 +174,18 @@ class StarloftCertification
             $idCard = trim((string)($ch['card'] ?? ''));
             if ($name === '' || $idCard === '') {
                 return $this->failHtml('姓名和身份证号不能为空,请返回重新填写');
+            }
+
+            // 年龄限制：不符合直接拒绝，避免发起核验产生费用
+            $ageError = $this->checkAgeLimit($idCard, $config);
+            if ($ageError !== '') {
+                $this->updateLocalCertiStatus($certifi, [
+                    'status'     => 2,
+                    'auth_fail'  => $ageError,
+                    'certify_id' => '',
+                    'notes'      => '年龄限制拦截',
+                ]);
+                return $this->failHtml($ageError);
             }
 
             return $this->createFvOrder($certifi, $config, $sdk, [
