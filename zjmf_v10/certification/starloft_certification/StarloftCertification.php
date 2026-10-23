@@ -14,11 +14,12 @@ use certification\starloft_certification\logic\FvSdk;
  *   - 异步回调：controller/IndexController.php 的 notifyHandle
  *
  * 面向智简魔方(IDC)用户提供「有源人脸识别」，子产品服务标识为 fv_auth。
- * 仅支持个人实名（后端 FV API 不支持企业四要素）。
+ * 个人实名：姓名+身份证号 + 人脸核验（fv_auth）；
+ * 企业实名：先企业要素核验（三要素/四要素，后台「企业要素核验方式」可配）通过后，再发起法人扫脸。
  * 收到平台结果后主动调用 /v1/fv/result 做结果校对再落地本地。
  *
  * @author StarLoft
- * @version 2.1.0
+ * @version 2.2.0
  */
 class StarloftCertification
 {
@@ -28,10 +29,10 @@ class StarloftCertification
     public $info = [
         'name'        => 'StarloftCertification',
         'title'       => 'StarLoft FV人脸核验认证',
-        'description' => 'StarLoft FV 人脸核验认证（有源人脸）— 智简魔方业务系统 v10',
+        'description' => 'StarLoft FV 人脸核验认证（有源人脸）— 个人/企业实名，企业先要素核验再扫脸 — 智简魔方业务系统 v10',
         'status'      => 1,
         'author'      => 'StarLoft',
-        'version'     => '2.1.0',
+        'version'     => '2.2.0',
         'help_url'    => 'https://docs.starloft.cn/fv/plugin/v10_fv',
     ];
 
@@ -205,17 +206,140 @@ class StarloftCertification
     }
 
     /**
-     * 企业实名认证入口（已停用：后端 FV API 仅支持个人实名，不支持企业四要素）
+     * 企业实名认证入口：先做企业要素核验（三要素/四要素，后台「企业要素核验方式」可配），
+     * 通过后再发起法人扫脸（有源人脸核验 fv_auth）
      */
     public function StarloftCertificationCompany($certifi)
     {
-        return $this->failHtml('企业实名暂不支持，请使用个人实名');
+        try {
+            $config = $this->configOf($certifi);
+            $sdk    = new FvSdk($config);
+
+            $ch = is_array($certifi['certifi'] ?? null)
+                ? array_merge($certifi['certifi'], is_array($certifi) ? $certifi : [])
+                : (is_array($certifi) ? $certifi : []);
+
+            $companyName = $this->pickField($ch, ['company_name', 'companyname', 'company', 'ent_name', 'enterprise_name']);
+            $creditCode  = $this->pickField($ch, ['credit_code', 'creditcode', 'credit_no', 'code', 'certcorpno', 'tyshxydm']);
+            $lrName      = $this->pickField($ch, ['lr_name', 'lrname', 'legal_name', 'legal_person', 'legalperson', 'fr_name']);
+            $idCard      = $this->pickField($ch, ['id_number', 'id_card', 'idcard', 'card', 'legal_id', 'legal_idcard', 'lr_card']);
+
+            if ($companyName === '' || $creditCode === '' || $lrName === '' || $idCard === '') {
+                return $this->failHtml('企业名称、统一社会信用代码、法人姓名、法人身份证号均不能为空,请返回重新填写');
+            }
+
+            // 年龄限制（按法人身份证号）：不符合直接拒绝，避免发起核验产生费用
+            $ageError = $this->checkAgeLimit($idCard, $config);
+            if ($ageError !== '') {
+                $this->updateLocalCertiStatus($certifi, [
+                    'status'     => 2,
+                    'auth_fail'  => $ageError,
+                    'certify_id' => '',
+                    'notes'      => '年龄限制拦截（法人）',
+                ]);
+                return $this->failHtml($ageError);
+            }
+
+            // 第一步：企业要素核验（三要素/四要素，后台可配；off=不核验）
+            $mode    = $this->companyVerifyMode($config);
+            $preNote = '';
+            if ($mode !== 'off') {
+                $ev = $sdk->verifyElements([
+                    'service'     => $mode,
+                    'ent_name'    => $companyName,
+                    'credit_code' => $creditCode,
+                    'lr_name'     => $lrName,
+                    'id_number'   => $idCard,
+                ]);
+                $cat = FvSdk::classifyError($ev);
+                if ($cat !== FvSdk::ERR_CAT_SUCCESS) {
+                    $msg = (string)($ev['message'] ?? '企业要素核验接口请求失败,请稍后再试');
+                    $this->updateLocalCertiStatus($certifi, [
+                        'status'     => 2,
+                        'auth_fail'  => '企业要素核验失败: ' . $msg,
+                        'certify_id' => '',
+                        'notes'      => "EV错误[{$cat}]: {$msg}\n时间: " . date('Y-m-d H:i:s'),
+                    ]);
+                    return $this->failHtml('企业要素核验失败：' . $msg);
+                }
+
+                $evData    = is_array($ev['data'] ?? null) ? $ev['data'] : [];
+                $evBizNo   = (string)($evData['biz_no'] ?? '');
+                $modeLabel = ($mode === 'biz4') ? '四要素' : '三要素';
+                if (empty($evData['verified'])) {
+                    $failMsg = $this->describeEvFail($evData);
+                    $this->updateLocalCertiStatus($certifi, [
+                        'status'     => 2,
+                        'auth_fail'  => $failMsg,
+                        'certify_id' => '',
+                        'notes'      => "企业{$modeLabel}要素核验未通过\nbiz_no: {$evBizNo}\n时间: " . date('Y-m-d H:i:s'),
+                    ]);
+                    return $this->failHtml($failMsg);
+                }
+                $preNote = "企业{$modeLabel}要素核验通过: biz_no={$evBizNo}";
+            }
+
+            // 第二步：法人扫脸（有源人脸核验 fv_auth）
+            return $this->createFvOrder($certifi, $config, $sdk, [
+                'name'    => $lrName,
+                'id_card' => $idCard,
+            ], $preNote);
+        } catch (\Exception $e) {
+            $errorMsg = '系统错误: ' . $e->getMessage();
+            $this->updateLocalCertiStatus($certifi, [
+                'status'    => 4,
+                'auth_fail' => $errorMsg,
+                'certify_id'=> '',
+                'notes'     => 'Exception: ' . $e->getMessage(),
+            ]);
+            return $this->failHtml($errorMsg);
+        }
+    }
+
+    /**
+     * 企业要素核验方式：biz3-三要素（默认）/ biz4-四要素 / off-不核验（直接法人扫脸）
+     */
+    protected function companyVerifyMode($config)
+    {
+        $m = strtolower(trim((string)($config['company_verify_mode'] ?? 'biz3')));
+        return in_array($m, ['biz3', 'biz4', 'off'], true) ? $m : 'biz3';
+    }
+
+    /**
+     * 从候选字段里取第一个非空值（兼容不同框架/版本的企业实名字段名）
+     */
+    protected function pickField($arr, array $keys)
+    {
+        foreach ($keys as $k) {
+            $v = trim((string)($arr[$k] ?? ''));
+            if ($v !== '') return $v;
+        }
+        return '';
+    }
+
+    /**
+     * 企业要素核验未通过时的用户可读原因
+     */
+    protected function describeEvFail(array $d)
+    {
+        if ((int)($d['status_code'] ?? 0) === 2) {
+            return '工商数据源未查询到该企业信息，请核对 企业名称 / 统一社会信用代码 / 法人姓名 后重试';
+        }
+        $msg = '企业要素核验未通过';
+        if ((int)($d['verify_result'] ?? 1) === 0) {
+            $msg .= '：填写的企业信息与工商登记不一致';
+        }
+        $status = trim((string)($d['operating_status'] ?? ''));
+        if ($status !== '' && strtolower($status) !== 'null') {
+            $msg .= '（企业当前状态：' . $status . '）';
+        }
+        return $msg;
     }
 
     /**
      * 创建人脸核验（fv_auth）订单并跳转认证
      */
-    protected function createFvOrder($certifi, $config, $sdk, array $identity)
+    protected function createFvOrder($certifi, $config, $sdk, array $identity, $preNote = '')
     {
         $uid    = $this->resolveCurrentUid($certifi);
         $domain = $this->resolveDomain();
@@ -253,7 +377,7 @@ class StarloftCertification
             'status'     => 4,
             'auth_fail'  => '',
             'certify_id' => $bizNo,
-            'notes'      => "FV平台流水号: {$bizNo}\n创建时间: " . date('Y-m-d H:i:s'),
+            'notes'      => "FV平台流水号: {$bizNo}\n创建时间: " . date('Y-m-d H:i:s') . ($preNote !== '' ? "\n{$preNote}" : ''),
         ]);
 
         if ($authUrl === '') {

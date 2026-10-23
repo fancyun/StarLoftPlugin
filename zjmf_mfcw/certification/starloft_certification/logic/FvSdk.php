@@ -278,4 +278,26 @@ class FvSdk
     {
         return $this->queryResult(['biz_no' => '0']);
     }
+
+    /**
+     * 企业要素核验（要素核验产品，v2 接口）
+     *
+     * @param array $params
+     *   - service:     ev_biz3（企业三要素）| ev_biz4（企业四要素）
+     *   - ent_name:    企业名称
+     *   - credit_code: 统一社会信用代码
+     *   - lr_name:     法人姓名
+     *   - id_number:   法人身份证号（四要素必填）
+     * @return array {code, message, data:{biz_no, service, verified, verify_result,
+     *         operating_status, status_code, request_id, billed, amount, pay_type, pack_count}}
+     */
+    public function verifyElements($params)
+    {
+        $service = $params['service'] ?? 'ev_biz3';
+        unset($params['service']);
+        $result = ($service === 'ev_biz4')
+            ? $this->client->verifyBiz4($params)
+            : $this->client->verifyBiz3($params);
+        return self::normalize($result);
+    }
 }

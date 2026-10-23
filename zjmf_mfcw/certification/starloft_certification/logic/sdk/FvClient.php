@@ -85,4 +85,27 @@ class FvClient
         }
         return $this->client->request('POST', '/v1/fv/result', $payload);
     }
+
+    /**
+     * 企业三要素核验（企业名称 + 统一社会信用代码 + 法人姓名）
+     *
+     * @param array $params {ent_name, credit_code, lr_name}
+     * @return array {code, message, data:{biz_no, service, verified, verify_result,
+     *         operating_status, status_code, request_id, billed, amount, pay_type, pack_count}}
+     */
+    public function verifyBiz3(array $params)
+    {
+        return $this->client->request('POST', '/v2/ev/biz3/verify', $params);
+    }
+
+    /**
+     * 企业四要素核验（三要素 + 法人身份证号）
+     *
+     * @param array $params {ent_name, credit_code, lr_name, id_number}
+     * @return array 同 verifyBiz3
+     */
+    public function verifyBiz4(array $params)
+    {
+        return $this->client->request('POST', '/v2/ev/biz4/verify', $params);
+    }
 }

@@ -1,7 +1,7 @@
 {
     "name": "StarLoft 人脸核验",
-    "version": "2.1.0",
-    "description": "对接「星楼网络」人脸核验(FV)服务的人脸识别认证插件（智简魔方业务系统 v10）。有源人脸核验（fv_auth），仅支持个人实名。",
+    "version": "2.2.0",
+    "description": "对接「星楼网络」人脸核验(FV)服务的人脸识别认证插件（智简魔方业务系统 v10）。有源人脸核验（fv_auth），支持个人与企业实名（企业先三/四要素核验再扫脸，可在后台配置）。",
     "author": "StarLoft",
     "website": "https://docs.starloft.cn/fv/plugin",
     "plugin_type": "certification",
@@ -9,7 +9,7 @@
     "namespace": "certification\\starloft_certification",
     "class": "StarloftCertification",
     "support_personal": true,
-    "support_company": false,
+    "support_company": true,
     "requires": {
         "php_version": ">=7.0",
         "extensions": [
@@ -71,6 +71,17 @@
             "type": "text",
             "required": false,
             "default": "0"
+        },
+        "company_verify_mode": {
+            "title": "企业要素核验方式",
+            "type": "radio",
+            "required": false,
+            "default": "biz3",
+            "options": {
+                "biz3": "三要素（企业名称+统一社会信用代码+法人姓名）",
+                "biz4": "四要素（三要素+法人身份证号）",
+                "off": "关闭（不核验，直接法人扫脸）"
+            }
         }
     }
 }
