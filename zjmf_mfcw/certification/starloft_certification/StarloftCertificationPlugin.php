@@ -16,12 +16,13 @@ use certification\starloft_certification\logic\FvSdk;
  *
  * 收到平台结果后，插件主动调用 /v1/fv/result 做一次「结果校对」，对齐上游后再落地本地。
  *
- * 外部回调入口（MFCW 按 /certification/{目录名}/{方法} 路由到本类方法，无登录态）：
+ * 外部访问入口（控制器见 controller/IndexController.php，无登录态）：
  *   - 异步通知: {域名}/certification/starloft_certification/callback?uid=xxx
- *   - 认证完成回跳: {域名}/certification/starloft_certification/result?uid=xxx
+ *   - 认证完成回跳: {域名}/certification/starloft_certification/result（默认回跳会员中心实名认证页，可在配置中修改）
+ *   - 状态查询: {域名}/certification/starloft_certification/getStatus
  *
  * @author StarLoft
- * @version 2.2.0
+ * @version 2.3.0
  */
 class StarloftCertificationPlugin extends Plugin
 {
@@ -34,7 +35,7 @@ class StarloftCertificationPlugin extends Plugin
         'description' => 'StarLoft FV 人脸核验认证（有源人脸）— 个人/企业实名，企业先要素核验再扫脸 — 智简魔方财务版',
         'status'      => 1,
         'author'      => 'StarLoft',
-        'version'     => '2.2.0',
+        'version'     => '2.3.0',
         'help_url'    => 'https://docs.starloft.cn/fv/plugin/starloft_certification'
     ];
 
@@ -445,8 +446,12 @@ class StarloftCertificationPlugin extends Plugin
 
         $orderParams = $identity;
         $orderParams['service']        = $this->buildService($config);
-        $orderParams['return_url']     = $domain . '/certification/starloft_certification/result?uid=' . $uid;
         $orderParams['biz_extra_data'] = json_encode(['uid' => $uid]);
+
+        $returnUrl = $this->buildReturnUrl($domain, $config);
+        if ($returnUrl !== '') {
+            $orderParams['return_url'] = $returnUrl;
+        }
         if (!$this->skipNotify($config)) {
             $orderParams['notify_url'] = $domain . '/certification/starloft_certification/callback?uid=' . $uid;
         }
@@ -619,6 +624,26 @@ class StarloftCertificationPlugin extends Plugin
     protected function skipNotify($config)
     {
         return (int)($config['skip_notify'] ?? 0) === 1;
+    }
+
+    /**
+     * 认证完成回跳地址：站内路径按本次请求的站点域名补全，完整 http(s) 地址原样使用；
+     * 未配置时返回空串，由平台停留在认证结果页、不发起回跳
+     */
+    protected function buildReturnUrl($domain, $config)
+    {
+        $url = trim((string)($config['return_url'] ?? ''));
+        if ($url === '') {
+            return '';
+        }
+        if (preg_match('#^https?://#i', $url)) {
+            return $url;
+        }
+        $domain = rtrim((string)$domain, '/');
+        if ($domain === '') {
+            return '';
+        }
+        return $domain . '/' . ltrim($url, '/');
     }
 
     /**

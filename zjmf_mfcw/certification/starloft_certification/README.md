@@ -30,6 +30,8 @@ starloft_certification/
 │   └── result()              # 认证完成回跳页
 ├── logic/
 │   └── FvSdk.php            # StarLoft SDK（API 通信 + HMAC 签名 + 错误分类）
+├── controller/
+│   └── IndexController.php  # 外部访问入口（result / callback / getStatus）
 ├── config.php                # 插件配置项
 ├── plugin.json               # 插件元数据
 ├── README.md                 # 本文档
@@ -92,9 +94,12 @@ starloft_certification/
 | 用途 | 地址 |
 |------|------|
 | 异步通知（核验结果推送） | `{站点域名}/certification/starloft_certification/callback?uid={用户ID}` |
-| 认证完成回跳 | `{站点域名}/certification/starloft_certification/result?uid={用户ID}` |
+| 认证完成回跳（默认） | 会员中心实名认证页，默认 `{站点域名}/user/certification` |
+| 认证完成回跳（可选） | 插件结果页 `{站点域名}/certification/starloft_certification/result` |
 | 状态查询（页面轮询） | `{站点域名}/certification/starloft_certification/getStatus` |
 
+- 回跳地址在插件配置「认证完成回跳地址」中维护：可填站内路径（如 `/user/certification`，自动补全为本站域名）或完整 `https` 地址；留空则停留平台认证结果页、不发起回跳。
+- 以上 `/certification/starloft_certification/*` 地址由插件根目录的 `controller/IndexController.php` 提供（财务版实名认证插件的外部访问入口必须放在 `controller/` 下，缺失会返回框架 404）。
 - 异步通知为服务器到服务器调用（无登录态），插件按 `X-Api-Key` 对应的 `api_secret` 校验 `sign` 签名后，先调用 `/v1/fv/result` 校对再落地本地，并始终返回 HTTP 2xx，避免平台反复补推。
 - 若站点无法被平台公网访问，请在配置中启用「跳过平台异步通知」，由页面轮询与结果校对同步。
 
@@ -106,7 +111,7 @@ starloft_certification/
 
 ## 技术支持
 
-- **版本**: v2.1.0
+- **版本**: v2.3.0
 - **兼容版本**: 智简魔方财务版 3.7.6+
 - **作者**: StarLoft
 - **文档**: https://docs.starloft.cn/fv/plugin

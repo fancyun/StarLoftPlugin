@@ -23,6 +23,7 @@ API Secret: your_api_secret_here
 ## ⚙️ 常用配置
 
 - 默认直接人脸核验（无需改动）。
+- **认证完成回跳地址**：默认 `/user/certification`（会员中心实名认证页），可改成站内其它路径或完整 `https` 地址；留空表示核验完成后停留在平台结果页。
 
 ## 🔧 故障排查
 
@@ -37,7 +38,7 @@ API Secret: your_api_secret_here
 
 ## 💡 版本信息
 
-- 版本: v2.1.0
+- 版本: v2.3.0
 - 兼容: 智简魔方财务版 3.7.6+
 - 作者: StarLoft
 
