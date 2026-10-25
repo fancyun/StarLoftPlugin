@@ -233,24 +233,20 @@ class FvSdk
     }
 
     /**
-     * 创建核验订单（子产品级）
+     * 创建核验订单
      *
      * @param array $params 参数
-     *   - service: 平台子产品服务标识，如 fv_auth / fv_self
      *   - notify_url: 后端结果通知地址
      *   - return_url: 前端回跳地址
      *   - name / id_card: 个人实名要素
      *   - biz_extra_data: 业务扩展数据（可选）
+     *   - service: 历史参数，平台仅支持 fv_auth，传入后忽略
      * @return array
      */
     public function createOrder($params)
     {
-        $service = $params['service'] ?? '';
         unset($params['service']);
-        $result = ($service === 'fv_self')
-            ? $this->client->startSelf($params)
-            : $this->client->startAuth($params);
-        return self::normalize($result);
+        return self::normalize($this->client->startAuth($params));
     }
 
     /**

@@ -38,7 +38,7 @@ API Secret: your_api_secret_here
 
 ## 💡 版本信息
 
-- 版本: v2.3.0
+- 版本: v2.4.0
 - 兼容: 智简魔方财务版 3.7.6+
 - 作者: StarLoft
 

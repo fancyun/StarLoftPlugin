@@ -6,9 +6,9 @@ use Exception;
 /**
  * 星楼网络（StarLoft）实名认证（人脸核身）通道
  *
- * 对接平台 /v1/fv：
- *   - POST /v1/fv/auth    创建核验订单，返回 biz_no（平台流水号）与 site_url（人脸核身承接页）
- *   - POST /v1/fv/result  查询/校对结果，status：1-通过 2-未通过 4-处理中
+ * 对接平台 /v2/fv：
+ *   - POST /v2/fv/auth    创建核验订单，返回 biz_no（平台流水号）与 site_url（人脸核身承接页）
+ *   - POST /v2/fv/result  查询/校对结果，status：1-通过 2-未通过 4-处理中
  *   - 异步通知            平台按 biz_no/cost/result_code/result_message/status 排序后 HMAC-SHA256 签名
  *
  * 鉴权：hmac_sha256_v2，签名绑定方法、路径、时间戳、nonce 与正文摘要。
@@ -42,7 +42,7 @@ class StarLoftCertify
      * @throws Exception
      */
     public function initialize($cert_name, $cert_no, $return_url, $notify_url, $extra_data = ''){
-        $data = $this->request('/v1/fv/auth', [
+        $data = $this->request('/v2/fv/auth', [
             'name' => (string)$cert_name,
             'id_card' => (string)$cert_no,
             'return_url' => (string)$return_url,
@@ -66,7 +66,7 @@ class StarLoftCertify
     public function query($biz_no, $sync = 0){
         $post = ['biz_no' => (string)$biz_no];
         if(intval($sync) == 1)$post['sync'] = 1;
-        $data = $this->request('/v1/fv/result', $post);
+        $data = $this->request('/v2/fv/result', $post);
         $status = isset($data['status']) ? intval($data['status']) : 4;
         if($status != 1 && $status != 2)$status = 4;
         $data['status'] = $status;

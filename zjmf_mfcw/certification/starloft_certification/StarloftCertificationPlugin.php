@@ -14,7 +14,7 @@ use certification\starloft_certification\logic\FvSdk;
  *   - 个人实名：姓名+身份证号 + 人脸核验（fv_auth）
  *   - 企业实名：先企业要素核验（三要素/四要素，后台可配）通过后，再发起法人扫脸（fv_auth）
  *
- * 收到平台结果后，插件主动调用 /v1/fv/result 做一次「结果校对」，对齐上游后再落地本地。
+ * 收到平台结果后，插件主动调用 /v2/fv/result 做一次「结果校对」，对齐上游后再落地本地。
  *
  * 外部访问入口（控制器见 controller/IndexController.php，无登录态）：
  *   - 异步通知: {域名}/certification/starloft_certification/callback?uid=xxx
@@ -22,7 +22,7 @@ use certification\starloft_certification\logic\FvSdk;
  *   - 状态查询: {域名}/certification/starloft_certification/getStatus
  *
  * @author StarLoft
- * @version 2.3.0
+ * @version 2.4.0
  */
 class StarloftCertificationPlugin extends Plugin
 {
@@ -35,7 +35,7 @@ class StarloftCertificationPlugin extends Plugin
         'description' => 'StarLoft FV 人脸核验认证（有源人脸）— 个人/企业实名，企业先要素核验再扫脸 — 智简魔方财务版',
         'status'      => 1,
         'author'      => 'StarLoft',
-        'version'     => '2.3.0',
+        'version'     => '2.4.0',
         'help_url'    => 'https://docs.starloft.cn/fv/plugin/starloft_certification'
     ];
 
@@ -493,7 +493,7 @@ class StarloftCertificationPlugin extends Plugin
     /**
      * 查询认证状态(前端轮询入口)
      *
-     * 每次查询调用 /v1/fv/result，即为对上游的「结果校对」；校验出终态后才落地本地。
+     * 每次查询调用 /v2/fv/result，即为对上游的「结果校对」；校验出终态后才落地本地。
      */
     public function getStatus($certifi)
     {

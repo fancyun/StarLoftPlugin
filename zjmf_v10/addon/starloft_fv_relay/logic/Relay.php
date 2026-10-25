@@ -19,16 +19,15 @@ class Relay
     /**
      * 可中转的端点白名单：endpoint 参数 => 平台路径 + 各 HTTP 方法所需权限码 + 计价配置键
      *
-     * 路径与权限码与平台 /v1/* 契约一一对应；客户只能按本表取值，不能传任意路径。
+     * 路径与权限码与平台 /v2/* 契约一一对应；客户只能按本表取值，不能传任意路径。
      */
     public static function endpoints()
     {
         return [
-            'fv/auth'           => ['path' => '/v1/fv/auth',       'methods' => ['POST' => 'fv_auth'],   'price' => 'price_fv_auth'],
-            'fv/self'           => ['path' => '/v1/fv/self',       'methods' => ['POST' => 'fv_self'],   'price' => 'price_fv_self'],
-            'fv/result'         => ['path' => '/v1/fv/result',     'methods' => ['POST' => 'fv_result']],
-            'fv/best-img'       => ['path' => '/v1/fv/best-img',   'methods' => ['POST' => 'fv_best_img']],
-            'fv/media'          => ['path' => '/v1/fv/media',      'methods' => ['POST' => 'fv_media']],
+            'fv/auth'           => ['path' => '/v2/fv/auth',       'methods' => ['POST' => 'fv_auth'],   'price' => 'price_fv_auth'],
+            'fv/result'         => ['path' => '/v2/fv/result',     'methods' => ['POST' => 'fv_result']],
+            'fv/best-img'       => ['path' => '/v2/fv/best-img',   'methods' => ['POST' => 'fv_best_img']],
+            'fv/media'          => ['path' => '/v2/fv/media',      'methods' => ['POST' => 'fv_media']],
         ];
     }
 
@@ -209,7 +208,7 @@ class Relay
         if ($apiUrl === '' || $key === '' || $secret === '') {
             return [false, '未配置平台 API 地址/密钥'];
         }
-        list($status, $raw, $err) = self::forward($apiUrl, $key, $secret, 'POST', '/v1/fv/result', '{"biz_no":"0"}');
+        list($status, $raw, $err) = self::forward($apiUrl, $key, $secret, 'POST', '/v2/fv/result', '{"biz_no":"0"}');
         if ($err !== '') {
             return [false, '连接失败：' . $err];
         }

@@ -3,7 +3,7 @@
 ## 插件简介
 
 对接「星楼网络」人脸核验(FV)服务的人脸识别认证插件，适用于**智简魔方业务系统 v10**。
-平台 API 域名为 `api.starloft.cn`，统一走 `/v1/fv` 接口前缀；人脸核验承接页在 `service.starloft.cn`。
+平台 API 域名为 `api.starloft.cn`，统一走 `/v2/fv` 接口前缀；人脸核验承接页在 `service.starloft.cn`。
 
 > 本插件（_fv）只做「有源人脸识别」（`fv_auth`）。IDC 用户仅实名第一次，不保留照片用于无源复用，因此只调用有源人脸核验。
 
@@ -12,7 +12,7 @@
 - ✅ 个人实名：姓名 + 身份证号 + 人脸核验（`fv_auth`）
 - ✅ 企业实名：**先企业要素核验**（三要素/四要素，后台可配；对接平台「要素核验」产品）通过后，**再发起法人扫脸**（`fv_auth`）
 - ✅ 按 v10 实名认证接口规范开发（`StarloftCertificationPerson` / `StarloftCertificationCompany` / `StarloftCertificationCollectionInfo`）
-- ✅ 收到结果后主动调用 `/v1/fv/result` 做结果校对，落地前对齐上游
+- ✅ 收到结果后主动调用 `/v2/fv/result` 做结果校对，落地前对齐上游
 - ✅ 支持跳过平台异步通知（只靠主动查询/校对同步结果）
 - ✅ 异步回调（notify_url）+ 前台状态轮询 + HMAC-SHA256 v2 签名认证
 - ✅ 幂等保护：认证中任务自动复用，避免重复发单扣费
@@ -47,7 +47,7 @@ starloft_certification/
 | API Secret | ✅ | 在 FV 平台后台获取，用于 HMAC 签名 |
 | 人脸核验体服务标识 | - | 默认 `fv_auth`（有源人脸） |
 | 跳过平台异步通知 | - | 启用后不回传 notify_url，结果由主动查询/校对同步 |
-| 落地前结果校对 | - | 启用后收到结果先调用 `/v1/fv/result` 校对再写本地 |
+| 落地前结果校对 | - | 启用后收到结果先调用 `/v2/fv/result` 校对再写本地 |
 | 最小年龄限制（周岁） | - | 0 表示不限制；如填 `18` 即要求年满 18 周岁（成年） |
 | 最大年龄限制（周岁） | - | 0 表示不限制；与最小年龄同时填写即为区间限制，如 `18` / `60` |
 | 企业要素核验方式 | - | 企业实名的核验方式：`三要素`（默认）/ `四要素` / `关闭`；三要素 = 企业名称+统一社会信用代码+法人姓名，四要素再加法人身份证号 |
@@ -93,13 +93,13 @@ starloft_certification/
 
 ## 平台对接说明
 
-- 接口前缀：`/v1/fv`（如 `/v1/fv/auth`、`/v1/fv/self`、`/v1/fv/result`、`/v1/fv/best-img`、`/v1/fv/media`）
+- 接口前缀：`/v2/fv`（如 `/v2/fv/auth`、`/v2/fv/result`、`/v2/fv/best-img`、`/v2/fv/media`）
 - 鉴权头（每个请求必带）：`X-Api-Key`、`X-Sign`（签名原文为方法、路径、查询串、时间戳、nonce、正文 SHA-256）、`X-Sign-Version: hmac_sha256_v2`、`X-Timestamp`、`X-Nonce`
 - 人脸核验子产品服务标识：`fv_auth`
 
 ## 技术支持
 
-- **版本**: v2.1.0
+- **版本**: v2.4.0
 - **兼容版本**: 智简魔方业务系统 v10
 - **作者**: StarLoft
 - **文档**: https://docs.starloft.cn/fv/plugin/v10_fv

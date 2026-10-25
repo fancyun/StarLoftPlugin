@@ -38,7 +38,7 @@ return [
         'title' => '端点白名单',
         'type'  => 'text',
         'value' => '',
-        'tip'   => '留空表示全部端点可中转；多个用英文逗号分隔，如：fv/auth,fv/self',
+        'tip'   => '留空表示全部端点可中转；多个用英文逗号分隔，如：fv/auth,fv/result',
     ],
 
     'daily_quota' => [
@@ -55,13 +55,6 @@ return [
         'type'  => 'text',
         'value' => '0',
         'tip'   => 'fv/auth（有源人脸核验）每次调用扣费金额，0 表示免费',
-    ],
-
-    'price_fv_self' => [
-        'title' => '无源人脸单价（元/次）',
-        'type'  => 'text',
-        'value' => '0',
-        'tip'   => 'fv/self（无源人脸核验）每次调用扣费金额，0 表示免费',
     ],
 
     'price_other' => [

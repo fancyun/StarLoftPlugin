@@ -14,7 +14,7 @@ patch/
 ├── admin/set.php                      # 改：短信接口设置加「星楼网络短信接口」；实名认证配置加「星楼网络人脸核身」
 ├── includes/functions.php             # 改：send_sms_common() 加 sms_api==5 分支
 ├── includes/lib/sms/StarLoft.php      # 新增：短信通道（HMAC 签名 + /v2/sms/send）
-├── includes/lib/StarLoftCertify.php   # 新增：实名认证通道（/v1/fv/auth、/v1/fv/result、异步通知验签）
+├── includes/lib/StarLoftCertify.php   # 新增：实名认证通道（/v2/fv/auth、/v2/fv/result、异步通知验签）
 ├── user/ajax.php                      # 改：注册时校验姓名/身份证并发起核身
 ├── user/ajax2.php                     # 改：certificate / cert_geturl 支持 cert_open==7
 ├── user/alipaycertok.php              # 改：核身完成回跳，查询结果并回写实名状态
@@ -83,12 +83,12 @@ POST /v2/sms/send  {phone_number_set, template_id, template_params[按顺序], s
 ```
 注册页（开启强制认证时显示姓名/身份证）
     ↓ 提交
-user/ajax.php?act=reg → 校验验证码/姓名/身份证 → 建号 → POST /v1/fv/auth（带 return_url / notify_url）
+user/ajax.php?act=reg → 校验验证码/姓名/身份证 → 建号 → POST /v2/fv/auth（带 return_url / notify_url）
     ↓ 返回 biz_no + site_url
 写入 pre_user：cert=0, certmethod=4, certno, certname, certtoken=biz_no
     ↓ 前端跳转 site_url（人脸核身承接页）
 用户完成扫脸
-    ├─ 同步回跳 user/alipaycertok.php?state=… → POST /v1/fv/result(sync=1) → status=1 则 cert=1, certtime=NOW()
+    ├─ 同步回跳 user/alipaycertok.php?state=… → POST /v2/fv/result(sync=1) → status=1 则 cert=1, certtime=NOW()
     └─ 异步通知 user/starloftnotify.php?uid=… → 验签（biz_no/cost/result_code/result_message/status 排序后 HMAC-SHA256）
                                              → 同样回写 cert=1（幂等，不重复扣认证费）
 ```
@@ -107,5 +107,5 @@ user/ajax.php?act=reg → 校验验证码/姓名/身份证 → 建号 → POST /
 ## 七、技术支持
 
 - 平台 API 文档：https://docs.starloft.cn/api
-- 接口对齐：短信 `POST /v2/sms/send`（创蓝 253 通道）；实名 `POST /v1/fv/auth`、`POST /v1/fv/result`、异步通知签名校验
+- 接口对齐：短信 `POST /v2/sms/send`（创蓝 253 通道）；实名 `POST /v2/fv/auth`、`POST /v2/fv/result`、异步通知签名校验
 - 作者：StarLoft

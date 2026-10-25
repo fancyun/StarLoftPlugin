@@ -22,10 +22,9 @@
 | 平台API Key | ✅ | 本站点在星楼网络的 API 密钥；**客户调用消耗的是这个账号的余额/资源包** |
 | 平台API Secret | ✅ | 与 Key 配对，用于 HMAC 签名 |
 | 管理令牌 | - | 管理页与所有管理操作的通行口令；留空时管理页不可访问 |
-| 端点白名单 | - | 留空=全部端点可中转；多个用英文逗号分隔，如 `fv/auth,fv/self` |
+| 端点白名单 | - | 留空=全部端点可中转；多个用英文逗号分隔，如 `fv/auth,fv/result` |
 | 单客户日调用上限 | - | 每个客户密钥每天最多调用次数，`0`=不限；超限返回 429 |
 | 有源人脸单价 | - | `fv/auth` 每次调用扣费金额 |
-| 无源人脸单价 | - | `fv/self` 每次调用扣费金额 |
 | 其余端点单价 | - | 结果查询/活体图等端点每次调用扣费金额，`0`=免费 |
 | 记录调用日志 | - | 是否记录调用明细（客户 / 端点 / 结果 / 耗时 / IP），供站点给客户对账 |
 
@@ -38,7 +37,6 @@
 | 配置项 | 计价方式 |
 |---|---|
 | 有源人脸单价 | `fv/auth` 每次调用扣一次 |
-| 无源人脸单价 | `fv/self` 每次调用扣一次 |
 | 其余端点单价 | 结果查询/活体图等，每次调用扣一次 |
 
 调用流程：**验签通过 → 按上述规则预扣（余额不足直接返回 402，不发起平台调用）→ 转发到平台 → 平台返回 `code != 0`（含转发失败）时把预扣金额原路退还**。响应头会带 `X-Relay-Price`（本次扣费）、`X-Relay-Balance`（扣后余额）、`X-Relay-Units`（计费单位数），客户可据此对账；每次调用的扣费与余额也记在调用日志里。单价留 `0` 即该端点免费。
@@ -89,11 +87,10 @@ https://你的站点/addons/starloft_fv_relay/apiAdmin?token=你配置的管理�
 
 | `endpoint` | HTTP | 平台路径 | 权限码 | 平台实名要求 |
 |---|---|---|---|---|
-| `fv/auth` | POST | `/v1/fv/auth` | `fv_auth` | 企业 |
-| `fv/self` | POST | `/v1/fv/self` | `fv_self` | 企业 |
-| `fv/result` | POST | `/v1/fv/result` | `fv_result` | 企业 |
-| `fv/best-img` | POST | `/v1/fv/best-img` | `fv_best_img` | 企业 |
-| `fv/media` | POST | `/v1/fv/media` | `fv_media` | 企业 |
+| `fv/auth` | POST | `/v2/fv/auth` | `fv_auth` | 企业 |
+| `fv/result` | POST | `/v2/fv/result` | `fv_result` | 企业 |
+| `fv/best-img` | POST | `/v2/fv/best-img` | `fv_best_img` | 企业 |
+| `fv/media` | POST | `/v2/fv/media` | `fv_media` | 企业 |
 
 ### 4.3 调用示例
 
@@ -196,8 +193,8 @@ location ^~ /v1/ {
 
 ## 8. 技术支持
 
-- 版本：v2.0.0 ｜ 兼容：智简魔方财务版 3.7.6+
-- 平台 API 文档：<https://docs.starloft.cn/fv/api/v1>
+- 版本：v2.1.0 ｜ 兼容：智简魔方财务版 3.7.6+
+- 平台 API 文档：<https://docs.starloft.cn/fv/api/v2>
 
 ---
 

@@ -199,7 +199,7 @@ location ^~ /v2/ {
 ## 8. 技术支持
 
 - 版本：v2.0.0 ｜ 兼容：智简魔方业务系统 v10 3.7.6+
-- 平台 API 文档：<https://docs.starloft.cn/sms/api/v1>
+- 平台 API 文档：<https://docs.starloft.cn/sms/api/v2>
 
 ---
 

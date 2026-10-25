@@ -16,10 +16,10 @@ use certification\starloft_certification\logic\FvSdk;
  * 面向智简魔方(IDC)用户提供「有源人脸识别」，子产品服务标识为 fv_auth。
  * 个人实名：姓名+身份证号 + 人脸核验（fv_auth）；
  * 企业实名：先企业要素核验（三要素/四要素，后台「企业要素核验方式」可配）通过后，再发起法人扫脸。
- * 收到平台结果后主动调用 /v1/fv/result 做结果校对再落地本地。
+ * 收到平台结果后主动调用 /v2/fv/result 做结果校对再落地本地。
  *
  * @author StarLoft
- * @version 2.2.0
+ * @version 2.4.0
  */
 class StarloftCertification
 {
@@ -32,7 +32,7 @@ class StarloftCertification
         'description' => 'StarLoft FV 人脸核验认证（有源人脸）— 个人/企业实名，企业先要素核验再扫脸 — 智简魔方业务系统 v10',
         'status'      => 1,
         'author'      => 'StarLoft',
-        'version'     => '2.2.0',
+        'version'     => '2.4.0',
         'help_url'    => 'https://docs.starloft.cn/fv/plugin/v10_fv',
     ];
 
@@ -387,7 +387,7 @@ class StarloftCertification
     }
 
     /**
-     * 结果校对：调用 /v1/fv/result 对齐上游最终状态后返回
+     * 结果校对：调用 /v2/fv/result 对齐上游最终状态后返回
      *
      * @return array ['status' => 0|1|2|4, 'msg' => ...]
      */
@@ -432,7 +432,7 @@ class StarloftCertification
     /**
      * 查询认证状态(前台轮询入口)
      *
-     * 每次查询调用 /v1/fv/result，即为对上游的「结果校对」；校验出终态后才落地本地。
+     * 每次查询调用 /v2/fv/result，即为对上游的「结果校对」；校验出终态后才落地本地。
      */
     public function getStatus($certifi)
     {

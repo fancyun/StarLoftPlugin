@@ -19,7 +19,7 @@ use addons\starloft_fv_relay\logic\Relay;
  *   - 免登录管理页：/addons/starloft_fv_relay/apiAdmin?token=xxx
  *
  * @author StarLoft
- * @version 2.0.0
+ * @version 2.1.0
  */
 class StarloftFvRelayPlugin extends Plugin
 {
@@ -33,7 +33,7 @@ class StarloftFvRelayPlugin extends Plugin
         'description' => '把 StarLoft 人脸核验 API 转售给站点客户：客户独立密钥、站点中转、调用日志 — 智简魔方财务版',
         'status'      => 1,
         'author'      => 'StarLoft',
-        'version'     => '2.0.0',
+        'version'     => '2.1.0',
         'help_url'    => 'https://docs.starloft.cn/relay/plugin/starloft_fv_relay',
     ];
 

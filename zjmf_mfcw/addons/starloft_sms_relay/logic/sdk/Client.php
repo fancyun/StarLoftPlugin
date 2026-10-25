@@ -41,7 +41,7 @@ class Client
      * 发送 HTTP 请求
      *
      * @param string $method   HTTP 方法（GET/POST/PUT/DELETE）
-     * @param string $endpoint 端点，如 /v1/sms/send
+     * @param string $endpoint 端点，如 /v2/sms/send
      * @param array  $data     POST/PUT 请求体；GET/DELETE 签名串为空字符串
      * @return array 解码后的响应数组
      */

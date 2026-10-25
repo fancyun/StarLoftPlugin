@@ -5,8 +5,8 @@ namespace StarLoft\Sdk;
 /**
  * StarLoft FV 人脸核验客户端
  *
- * 接口前缀统一为 /v1/fv，API 域名 api.starloft.cn
- * 子产品：fv_auth（有源）、fv_self（无源）
+ * 接口前缀统一为 /v2/fv，API 域名 api.starloft.cn
+ * 子产品：fv_auth（有源；无源 fv_self 已下线）
  */
 class FvClient
 {
@@ -22,8 +22,8 @@ class FvClient
      * 发起人脸核验认证
      *
      * @param array $params
-     *   - name:           string 姓名（fv_auth 必填）
-     *   - id_card:        string 身份证号（fv_auth 必填）
+     *   - name:           string 姓名（必填）
+     *   - id_card:        string 身份证号（必填）
      *   - return_url:     string 前端回跳地址（可选）
      *   - notify_url:     string 后端结果通知地址（必填）
      *   - biz_extra_data: string 业务扩展数据（可选）
@@ -31,21 +31,7 @@ class FvClient
      */
     public function startAuth(array $params)
     {
-        return $this->client->request('POST', '/v1/fv/auth', $params);
-    }
-
-    /**
-     * 发起无源人脸核验
-     *
-     * @param array $params
-     *   - return_url:     string 前端回跳地址（可选）
-     *   - notify_url:     string 后端结果通知地址（必填）
-     *   - biz_extra_data: string 业务扩展数据（可选）
-     * @return array {code, message, data:{biz_no, site_url, expired_in, expired_time}}
-     */
-    public function startSelf(array $params)
-    {
-        return $this->client->request('POST', '/v1/fv/self', $params);
+        return $this->client->request('POST', '/v2/fv/auth', $params);
     }
 
     /**
@@ -56,7 +42,7 @@ class FvClient
      */
     public function getBestImg($bizNo)
     {
-        return $this->client->request('POST', '/v1/fv/best-img', ['biz_no' => $bizNo]);
+        return $this->client->request('POST', '/v2/fv/best-img', ['biz_no' => $bizNo]);
     }
 
     /**
@@ -67,7 +53,7 @@ class FvClient
      */
     public function getMedia($bizNo)
     {
-        return $this->client->request('POST', '/v1/fv/media', ['biz_no' => $bizNo]);
+        return $this->client->request('POST', '/v2/fv/media', ['biz_no' => $bizNo]);
     }
 
     /**
@@ -83,7 +69,7 @@ class FvClient
         if ((int)$sync === 1) {
             $payload['sync'] = 1;
         }
-        return $this->client->request('POST', '/v1/fv/result', $payload);
+        return $this->client->request('POST', '/v2/fv/result', $payload);
     }
 
     /**
