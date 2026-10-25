@@ -90,7 +90,7 @@ user/ajax.php?act=reg → 校验验证码/姓名/身份证 → 建号 → POST /
 用户完成扫脸
     ├─ 同步回跳 user/alipaycertok.php?state=… → POST /v2/fv/result(sync=1) → status=1 则 cert=1, certtime=NOW()
     └─ 异步通知 user/starloftnotify.php?uid=… → 验签（biz_no/cost/result_code/result_message/status 排序后 HMAC-SHA256）
-                                             → 同样回写 cert=1（幂等，不重复扣认证费）
+                                             → 先 POST /v2/fv/result(sync=1) 校对，再回写 cert=1（幂等，不重复扣认证费）
 ```
 
 商户登录后也可在商户后台「实名认证」页自助补做（原版页面，已支持 `cert_open=7`）。

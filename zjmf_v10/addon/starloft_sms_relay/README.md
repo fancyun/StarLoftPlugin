@@ -143,9 +143,12 @@ $resp = curl_exec($ch);
 
 ### 4.4 可选：让官方 SDK 直接复用（需站点 Nginx 加一条重写）
 
-官方 SDK 会把 `api_url` 与 `/v2/xxx` 拼在一起，用下面这条重写即可把 `/v2/*` 映射到中转端点，客户无需改 SDK 代码，只改 `api_url` 与密钥：
+官方 SDK 按 `api_url + /v1/*` 拼接（平台已统一到 `/v2/*`，SDK 仓库尚未跟进），下面两条重写可把 `/v1/*` 与 `/v2/*` 都映射到中转端点，客户无需改 SDK 代码，只改 `api_url` 与密钥：
 
 ```nginx
+location ^~ /v1/ {
+    rewrite ^/v1/(.*)$ /addon/starloft_sms_relay/index/apiRelay?endpoint=$1 last;
+}
 location ^~ /v2/ {
     rewrite ^/v2/(.*)$ /addon/starloft_sms_relay/index/apiRelay?endpoint=$1 last;
 }
