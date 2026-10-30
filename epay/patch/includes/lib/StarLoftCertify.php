@@ -67,10 +67,32 @@ class StarLoftCertify
         $post = ['biz_no' => (string)$biz_no];
         if(intval($sync) == 1)$post['sync'] = 1;
         $data = $this->request('/v2/fv/result', $post);
-        $status = isset($data['status']) ? intval($data['status']) : 4;
-        if($status != 1 && $status != 2)$status = 4;
-        $data['status'] = $status;
+        $data['status'] = $this->normalizeNotifyStatus($data);
         return $data;
+    }
+
+    /**
+     * 将平台状态归一化为商户侧状态：1-通过、2-未通过、4-处理中。
+     * 当前 API 使用 2-成功、3/4/5/6-失败；兼容旧版 1-成功、2-失败。
+     * result_code/result_message 用于消除新旧版本都使用状态 2 时的歧义。
+     */
+    public function normalizeNotifyStatus($data){
+        if(!is_array($data))return 4;
+
+        $rawStatus = intval($data['status'] ?? 0);
+        $resultCode = trim((string)($data['result_code'] ?? ''));
+        $resultMessage = strtoupper(trim((string)($data['result_message'] ?? '')));
+        $isSuccess = $resultCode === '1000' || $resultMessage === 'SUCCESS';
+
+        if(in_array($rawStatus, [3, 4, 5, 6], true))return 2;
+        if($rawStatus === 2){
+            if($isSuccess || ($resultCode === '' && $resultMessage === ''))return 1;
+            return 2;
+        }
+        if($rawStatus === 1)return $isSuccess ? 1 : 4;
+
+        if($isSuccess)return 1;
+        return 4;
     }
 
     /**

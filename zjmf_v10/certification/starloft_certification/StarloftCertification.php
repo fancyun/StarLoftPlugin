@@ -406,6 +406,14 @@ class StarloftCertification
                 $orderData    = is_array($result['data'] ?? null) ? $result['data'] : [];
                 $orderCode    = (int)($orderData['result_code'] ?? $orderData['status_code'] ?? $orderData['code'] ?? 0);
                 $orderMessage = (string)($orderData['result_message'] ?? $orderData['message'] ?? '');
+                $platformStatus = $this->normalizePlatformStatus($orderData);
+                if ($platformStatus === 1) {
+                    return ['status' => 1, 'msg' => '身份核验通过'];
+                }
+                if ($platformStatus === 2) {
+                    $failMsg = $this->translateResultMsg($orderMessage) ?: ($orderMessage !== '' ? $orderMessage : '身份核验未通过');
+                    return ['status' => 2, 'msg' => $failMsg];
+                }
                 if ($orderCode === 1000 || $orderMessage === 'SUCCESS') {
                     return ['status' => 1, 'msg' => '身份核验通过'];
                 }
@@ -457,6 +465,21 @@ class StarloftCertification
                 $orderData    = is_array($result['data'] ?? null) ? $result['data'] : [];
                 $orderCode    = (int)($orderData['result_code'] ?? $orderData['status_code'] ?? $orderData['code'] ?? 0);
                 $orderMessage = (string)($orderData['result_message'] ?? $orderData['message'] ?? '');
+
+                $platformStatus = $this->normalizePlatformStatus($orderData);
+                if ($platformStatus === 1) {
+                    $this->updateLocalCertiStatus($certifi, [
+                        'status' => 1, 'auth_fail' => '', 'certify_id' => $certifyId,
+                    ]);
+                    return ['status' => 1, 'msg' => '身份核验通过'];
+                }
+                if ($platformStatus === 2) {
+                    $failMsg = $this->translateResultMsg($orderMessage) ?: ($orderMessage !== '' ? $orderMessage : '身份核验未通过');
+                    $this->updateLocalCertiStatus($certifi, [
+                        'status' => 2, 'auth_fail' => $failMsg, 'certify_id' => $certifyId,
+                    ]);
+                    return ['status' => 2, 'msg' => $failMsg];
+                }
 
                 if ($orderCode === 1000 || $orderMessage === 'SUCCESS') {
                     $this->updateLocalCertiStatus($certifi, [
@@ -654,6 +677,32 @@ class StarloftCertification
 
         $expect = hash_hmac('sha256', $canonical, $secret);
         return hash_equals($expect, strtolower(trim((string)$sign)));
+    }
+
+    /**
+     * 将平台状态归一化为本地实名状态：1-通过、2-未通过、4-处理中。
+     * 当前 API 使用 2-成功、3/4/5/6-失败；兼容旧版 1-成功、2-失败。
+     */
+    public function normalizeNotificationStatus($data)
+    {
+        return $this->normalizePlatformStatus(is_array($data) ? $data : []);
+    }
+
+    protected function normalizePlatformStatus(array $data)
+    {
+        $rawStatus = (int)($data['status'] ?? 0);
+        $resultCode = trim((string)($data['result_code'] ?? ''));
+        $resultMessage = strtoupper(trim((string)($data['result_message'] ?? '')));
+        $isSuccess = $resultCode === '1000' || $resultMessage === 'SUCCESS';
+
+        if (in_array($rawStatus, [3, 4, 5, 6], true)) return 2;
+        if ($rawStatus === 2) {
+            if ($isSuccess || ($resultCode === '' && $resultMessage === '')) return 1;
+            return 2;
+        }
+        if ($rawStatus === 1) return $isSuccess ? 1 : 4;
+        if ($isSuccess) return 1;
+        return 4;
     }
 
     /**

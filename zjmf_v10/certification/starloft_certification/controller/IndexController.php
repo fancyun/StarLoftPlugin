@@ -37,15 +37,19 @@ class IndexController
         $sign = (string)($data['sign'] ?? '');
         $plugin = new StarloftCertification();
         if (!$plugin->verifyNotifySign($data, $sign)) {
+            if (!headers_sent()) http_response_code(401);
             echo json_encode(['code' => 401, 'message' => 'signature verification failed']);
             return;
         }
 
         $bizNo = trim((string)($data['biz_no'] ?? ''));
         if ($bizNo === '') {
+            if (!headers_sent()) http_response_code(400);
             echo json_encode(['code' => 400, 'message' => '缺少 biz_no']);
             return;
         }
+
+        $notifyStatus = $plugin->normalizeNotificationStatus($data);
 
         // 视配置决定是否在落地前主动调用平台「结果校对」接口对齐上游最终状态；
         // 关闭时直接采用通知体里的状态，少一次上游请求。
@@ -53,23 +57,32 @@ class IndexController
             $reconciled  = $plugin->reconcile($bizNo);
             $localStatus = (int)($reconciled['status'] ?? 0);
             $resultMsg   = (string)($reconciled['msg'] ?? '');
+            // 已验签通知本身就是平台终态；校对异常或尚未同步时不要丢弃该结果。
+            if ($localStatus !== 1 && $localStatus !== 2 && ($notifyStatus === 1 || $notifyStatus === 2)) {
+                $localStatus = $notifyStatus;
+            }
         } else {
-            $localStatus = (int)($data['status'] ?? 4);
+            $localStatus = $notifyStatus;
             $resultMsg   = (string)($data['result_message'] ?? '');
         }
 
-        if (($localStatus === 1 || $localStatus === 2) && $resultMsg !== '') {
-            $updated = $this->updateByCertifyId($bizNo, $localStatus, $resultMsg);
-            echo json_encode($updated
-                ? ['code' => 0, 'message' => 'success']
-                : ['code' => 404, 'message' => '未找到对应实名记录']);
+        if ($resultMsg === '') $resultMsg = (string)($data['result_message'] ?? '');
+        if ($localStatus === 1 && $resultMsg === '') $resultMsg = '身份核验通过';
+        if ($localStatus === 2 && $resultMsg === '') $resultMsg = '身份核验未通过';
+        if ($localStatus !== 1 && $localStatus !== 2) {
+            if (!headers_sent()) http_response_code(503);
+            echo json_encode(['code' => 503, 'message' => '尚未取得实名终态，请稍后重试']);
             return;
         }
 
-        $updated = $this->updateByCertifyId($bizNo, 4, $resultMsg);
-        echo json_encode($updated
-            ? ['code' => 0, 'message' => 'success']
-            : ['code' => 404, 'message' => '未找到对应实名记录']);
+        $updated = $this->updateByCertifyId($bizNo, $localStatus, $localStatus === 2 ? $resultMsg : '');
+        if (!$updated) {
+            // HTTP 非 2xx 才会让平台重试，避免「已确认送达但本地未回写」。
+            if (!headers_sent()) http_response_code(503);
+            echo json_encode(['code' => 503, 'message' => '实名记录暂不可更新，请稍后重试']);
+            return;
+        }
+        echo json_encode(['code' => 0, 'message' => 'success']);
     }
 
     /**

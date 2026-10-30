@@ -375,7 +375,7 @@ class StarloftCertificationPlugin extends Plugin
      * 平台异步通知入口（核验结果推送）
      *
      * 校验 HMAC 签名后，先调用平台查询接口做一次「结果校对」对齐上游最终状态，再落地本地；
-     * 始终返回 JSON（HTTP 2xx），避免平台按指数退避反复补推。
+     * 只有本地状态写入成功才返回 2xx；暂时无法落库时返回非 2xx 由平台补推。
      */
     public function callback($params = [])
     {
@@ -387,13 +387,17 @@ class StarloftCertificationPlugin extends Plugin
 
         $sign = (string)($data['sign'] ?? '');
         if (!$this->verifyNotifySign($data, $sign, $params)) {
+            if (!headers_sent()) http_response_code(401);
             return json_encode(['code' => 401, 'message' => 'signature verification failed']);
         }
 
         $bizNo = trim((string)($data['biz_no'] ?? ''));
         if ($bizNo === '') {
+            if (!headers_sent()) http_response_code(400);
             return json_encode(['code' => 400, 'message' => '缺少 biz_no']);
         }
+
+        $notifyStatus = $this->normalizePlatformStatus($data);
 
         // 视配置决定是否在落地前主动调用平台「结果校对」接口对齐上游最终状态；
         // 关闭时直接采用通知体里的状态，少一次上游请求。
@@ -401,16 +405,48 @@ class StarloftCertificationPlugin extends Plugin
             $reconciled = $this->reconcile($bizNo, $params);
             $status     = (int)($reconciled['status'] ?? 4);
             $resultMsg  = (string)($reconciled['msg'] ?? '');
+            // 已验签通知本身就是平台终态；校对异常或尚未同步时不要丢弃该结果。
+            if ($status !== 1 && $status !== 2 && ($notifyStatus === 1 || $notifyStatus === 2)) {
+                $status = $notifyStatus;
+            }
         } else {
-            $status    = (int)($data['status'] ?? 4);
+            $status    = $notifyStatus;
             $resultMsg = (string)($data['result_message'] ?? '');
         }
         if ($status !== 1 && $status !== 2) {
-            $status = 4;
+            if (!headers_sent()) http_response_code(503);
+            return json_encode(['code' => 503, 'message' => '尚未取得实名终态，请稍后重试']);
         }
-        $this->updateCertificationByBizNo($bizNo, $status, $status === 2 ? $resultMsg : '');
+        if ($resultMsg === '') $resultMsg = (string)($data['result_message'] ?? '');
+        if ($status === 1 && $resultMsg === '') $resultMsg = '身份核验通过';
+        if ($status === 2 && $resultMsg === '') $resultMsg = '身份核验未通过';
+        if (!$this->updateCertificationByBizNo($bizNo, $status, $status === 2 ? $resultMsg : '')) {
+            if (!headers_sent()) http_response_code(503);
+            return json_encode(['code' => 503, 'message' => '实名记录暂不可更新，请稍后重试']);
+        }
 
         return json_encode(['code' => 0, 'message' => 'success']);
+    }
+
+    /**
+     * 将平台状态归一化为本地实名状态：1-通过、2-未通过、4-处理中。
+     * 当前 API 使用 2-成功、3/4/5/6-失败；兼容旧版 1-成功、2-失败。
+     */
+    protected function normalizePlatformStatus(array $data)
+    {
+        $rawStatus = (int)($data['status'] ?? 0);
+        $resultCode = trim((string)($data['result_code'] ?? ''));
+        $resultMessage = strtoupper(trim((string)($data['result_message'] ?? '')));
+        $isSuccess = $resultCode === '1000' || $resultMessage === 'SUCCESS';
+
+        if (in_array($rawStatus, [3, 4, 5, 6], true)) return 2;
+        if ($rawStatus === 2) {
+            if ($isSuccess || ($resultCode === '' && $resultMessage === '')) return 1;
+            return 2;
+        }
+        if ($rawStatus === 1) return $isSuccess ? 1 : 4;
+        if ($isSuccess) return 1;
+        return 4;
     }
 
     /**
@@ -512,6 +548,21 @@ class StarloftCertificationPlugin extends Plugin
                 $orderData    = is_array($result['data'] ?? null) ? $result['data'] : [];
                 $orderCode    = (int)($orderData['result_code'] ?? $orderData['status_code'] ?? $orderData['code'] ?? 0);
                 $orderMessage = (string)($orderData['result_message'] ?? $orderData['message'] ?? '');
+
+                $platformStatus = $this->normalizePlatformStatus($orderData);
+                if ($platformStatus === 1) {
+                    $this->writePersonalStatus([
+                        'status' => 1, 'auth_fail' => '', 'certify_id' => $certifyId,
+                    ]);
+                    return ['status' => 1, 'msg' => '身份核验通过'];
+                }
+                if ($platformStatus === 2) {
+                    $failMsg = $this->translateResultMsg($orderMessage) ?: ($orderMessage !== '' ? $orderMessage : '身份核验未通过');
+                    $this->writePersonalStatus([
+                        'status' => 2, 'auth_fail' => $failMsg, 'certify_id' => $certifyId,
+                    ]);
+                    return ['status' => 2, 'msg' => $failMsg];
+                }
 
                 if ($orderCode === 1000 || $orderMessage === 'SUCCESS') {
                     $this->writePersonalStatus([
@@ -710,6 +761,15 @@ class StarloftCertificationPlugin extends Plugin
             $orderData    = is_array($result['data'] ?? null) ? $result['data'] : [];
             $orderCode    = (int)($orderData['result_code'] ?? $orderData['status_code'] ?? $orderData['code'] ?? 0);
             $orderMessage = (string)($orderData['result_message'] ?? $orderData['message'] ?? '');
+
+            $platformStatus = $this->normalizePlatformStatus($orderData);
+            if ($platformStatus === 1) {
+                return ['status' => 1, 'msg' => '身份核验通过'];
+            }
+            if ($platformStatus === 2) {
+                $failMsg = $this->translateResultMsg($orderMessage) ?: ($orderMessage !== '' ? $orderMessage : '身份核验未通过');
+                return ['status' => 2, 'msg' => $failMsg];
+            }
 
             if ($orderCode === 1000 || $orderMessage === 'SUCCESS') {
                 return ['status' => 1, 'msg' => '身份核验通过'];
